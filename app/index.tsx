@@ -113,19 +113,51 @@ export default function Page() {
     `);
   };
 
+  const injectScript = `
+  window.addEventListener('load', function() {
+    // 기본 viewport 설정
+    const meta = document.createElement('meta');
+    meta.name = 'viewport';
+    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.getElementsByTagName('head')[0].appendChild(meta);
+
+    // input focus 시점에 바로 처리
+    document.addEventListener('focus', function(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        // 즉시 scale 체크 및 재설정
+        requestAnimationFrame(() => {
+          meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+        });
+      }
+    }, true);
+
+    // 추가적인 안전장치로 gesturestart 방지
+    document.addEventListener('gesturestart', function(e) {
+      e.preventDefault();
+    });
+
+    true;
+  });
+`;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
       <ExpoStatusBar style="dark" />
       <WebView
         ref={webViewRef}
-        source={{ uri: Config.API_HOST }} // 여기에 표시할 웹사이트 URL을 입력하세요
+        source={{ uri: Config.API_HOST }}
         style={{ flex: 1 }}
         onLoadStart={() => setIsLoading(true)}
         onLoadEnd={() => setIsLoading(false)}
         onMessage={handleMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        scalesPageToFit={true}
+        bounces={false}
+        automaticallyAdjustContentInsets={false}
+        injectedJavaScript={injectScript}
+        scalesPageToFit={false}
+        scrollEnabled={true}
+        contentMode="mobile"
       />
     </SafeAreaView>
   );
