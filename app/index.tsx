@@ -15,6 +15,8 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
 
+  console.log("ip주소: ", Config.API_HOST);
+
   useEffect(() => {
     RNStatusBar.setBarStyle("dark-content", true);
   }, []);
