@@ -1,3 +1,4 @@
+import * as MediaLibrary from "expo-media-library";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
@@ -7,6 +8,7 @@ import {
   SafeAreaView,
   StatusBar as RNStatusBar,
 } from "react-native";
+import { captureScreen } from "react-native-view-shot";
 import { WebView } from "react-native-webview";
 
 import Config from "@/constants/Config";
@@ -14,8 +16,6 @@ import Config from "@/constants/Config";
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
-
-  console.log("ip주소: ", Config.API_HOST);
 
   useEffect(() => {
     RNStatusBar.setBarStyle("dark-content", true);
@@ -36,87 +36,44 @@ export default function Page() {
       const { type, data } = JSON.parse(event.nativeEvent.data);
 
       switch (type) {
-        case "REQUEST_PAYMENT":
-          await handlePaymentRequest(data);
+        case "SAVE_SCREEN":
+          await handleScreenCapture();
           break;
-
         default:
           console.log("Unknown message type:", type);
       }
     } catch (error: any) {
       console.error("Message handling error:", error);
-      sendPaymentResultToWeb({
-        success: false,
-        error: error.message,
-      });
     }
   };
 
-  const handlePaymentRequest = async (paymentData: any) => {
+  const handleScreenCapture = async () => {
     try {
-      // 1. 결제창 표시 전 작업
-      Alert.alert(
-        "결제 안내",
-        `결제금액: ${paymentData.amount}원\n상품: ${paymentData.productName}`,
-        [
-          {
-            text: "취소",
-            onPress: () =>
-              sendPaymentResultToWeb({
-                success: false,
-                error: "USER_CANCEL",
-              }),
-            style: "cancel",
-          },
-          {
-            text: "결제하기",
-            onPress: async () => {
-              // 2. 실제 결제 처리 (예: PG사 SDK 호출)
-              try {
-                // 여기에서 실제 결제 프로세스 구현
-                // const paymentResult = await PaymentSDK.process(paymentData);
+      if (Platform.OS === "android") {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("권한 필요", "저장하기 위해 권한이 필요합니다.");
+          return;
+        }
+      }
 
-                // 3. 결제 성공 시 웹앱으로 결과 전송
-                sendPaymentResultToWeb({
-                  success: true,
-                  transactionId: "dummy-tx-id", // 실제 결제 후 생성되는 거래 ID
-                  paidAmount: paymentData.amount,
-                  formData: paymentData.formData,
-                });
-              } catch (error: any) {
-                // 4. 결제 실패 시 에러 전송
-                sendPaymentResultToWeb({
-                  success: false,
-                  error: error.message,
-                });
-              }
-            },
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error("Payment processing error:", error);
-      sendPaymentResultToWeb({
-        success: false,
-        error: error.message,
+      const uri = await captureScreen({
+        format: "jpg",
+        quality: 0.8,
       });
+
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync("행운사주", asset, false);
+
+      Alert.alert("저장 완료", "이미지가 갤러리에 저장되었습니다.");
+    } catch (error) {
+      console.error("Screen capture error:", error);
+      Alert.alert("저장 실패", "화면을 저장하는 중 오류가 발생했습니다.");
     }
-  };
-
-  const sendPaymentResultToWeb = (result: any) => {
-    const message = JSON.stringify({
-      type: "PAYMENT_RESULT",
-      data: result,
-    });
-
-    webViewRef.current?.injectJavaScript(`
-      window.postMessage('${message}', '*');
-      true;
-    `);
   };
 
   const injectScript = `
-  window.addEventListener('load', function() {
+    window.addEventListener('load', function() {
     // 기본 viewport 설정
     const meta = document.createElement('meta');
     meta.name = 'viewport';
@@ -136,11 +93,18 @@ export default function Page() {
     // 추가적인 안전장치로 gesturestart 방지
     document.addEventListener('gesturestart', function(e) {
       e.preventDefault();
+  
+      // 캡처 함수 추가
+      window.captureScreen = function() {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'SAVE_SCREEN',
+          data: {}
+        }));
+      };
+  
+      true;
     });
-
-    true;
-  });
-`;
+  `;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
