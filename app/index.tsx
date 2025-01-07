@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
 import * as Print from "expo-print";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
@@ -44,6 +45,9 @@ export default function Page() {
         case "SAVE_SCREEN": // 웹에서 저장 요청이 왔을 때
           startCapture(); // 캡처 시작
           break;
+        case "SAVE_IMAGE":
+          await handleImageSave(data);
+          break;
         case "CAPTURE_FULL_PAGE":
           await handleFullPageCapture(data);
           break;
@@ -56,7 +60,6 @@ export default function Page() {
   const captureFullPageScript = `
 (function() {
   const processNextImage = async (img) => {
-    // srcset에서 가장 큰 이미지 URL 가져오기
     const srcset = img.getAttribute('srcset');
     if (srcset) {
       const srcsetItems = srcset.split(',')
@@ -70,15 +73,12 @@ export default function Page() {
         .sort((a, b) => b.width - a.width);
 
       if (srcsetItems.length > 0) {
-        // 가장 큰 이미지 사용
         img.src = srcsetItems[0].url;
-        // 원본 속성 제거
         img.removeAttribute('srcset');
         img.removeAttribute('data-nimg');
       }
     }
 
-    // 이미지 로딩 대기
     if (!img.complete) {
       await new Promise((resolve) => {
         img.onload = resolve;
@@ -89,10 +89,8 @@ export default function Page() {
 
   const waitForImages = async () => {
     const nextImages = document.querySelectorAll('img[data-nimg]');
-    // Next.js 이미지 처리
     await Promise.all(Array.from(nextImages).map(processNextImage));
     
-    // 일반 이미지 처리
     const allImages = document.querySelectorAll('img');
     await Promise.all(Array.from(allImages).map(img => {
       if (img.complete) return Promise.resolve();
@@ -104,80 +102,81 @@ export default function Page() {
   };
 
   const captureContent = async () => {
-    const body = document.body;
-    const html = document.documentElement;
+    const element = document.body;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
     
-    // 스타일 수집
-    const styles = Array.from(document.styleSheets)
-      .map(sheet => {
-        try {
-          return Array.from(sheet.cssRules)
-            .map(rule => rule.cssText)
-            .join('');
-        } catch (e) {
-          return '';
-        }
-      })
-      .join('');
+    // 캔버스 크기 설정
+    canvas.width = element.scrollWidth;
+    canvas.height = element.scrollHeight;
 
-    // 이미지를 base64로 변환
-    const images = Array.from(document.images);
-    await Promise.all(images.map(async (img) => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const dataUrl = canvas.toDataURL('image/png');
-        img.setAttribute('src', dataUrl);
-        img.style.maxWidth = '100%';
-        img.style.height = 'auto';
-      } catch (e) {
-        console.error('이미지 변환 실패:', e);
-      }
-    }));
+    // html2canvas 사용
+    const html2canvas = window.html2canvas;
+    const renderedCanvas = await html2canvas(element, {
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+      width: element.scrollWidth,
+      height: element.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      scale: 1,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      foreignObjectRendering: true,
+    });
+
+    const imageData = renderedCanvas.toDataURL('image/png', 1.0);
 
     window.ReactNativeWebView.postMessage(JSON.stringify({
-      type: 'CAPTURE_FULL_PAGE',
+      type: 'SAVE_IMAGE',
       data: {
-        height: Math.max(
-          body.scrollHeight,
-          body.offsetHeight,
-          html.clientHeight,
-          html.scrollHeight,
-          html.offsetHeight
-        ),
-        width: Math.max(
-          body.scrollWidth,
-          body.offsetWidth,
-          html.clientWidth,
-          html.scrollWidth,
-          html.offsetWidth
-        ),
-        styles: styles + \`
-          img {
-            display: block;
-            max-width: 100% !important;
-            height: auto !important;
-            margin: 0 auto;
-          }
-          .image-container {
-            position: relative !important;
-            height: auto !important;
-          }
-        \`,
-        content: document.documentElement.outerHTML
+        imageData: imageData,
+        filename: \`행운사주_\${new Date().getTime()}.png\`
       }
     }));
   };
 
-  // 실행
   waitForImages()
     .then(captureContent)
     .catch(error => console.error('캡처 중 오류:', error));
 })();
 `;
+
+  const handleImageSave = async (data: {
+    imageData: string;
+    filename: string;
+  }) => {
+    try {
+      // 권한 요청
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("권한 필요", "갤러리 접근 권한이 필요합니다.");
+        return;
+      }
+
+      // base64 데이터에서 헤더 제거
+      const base64Data = data.imageData.replace(/^data:image\/\w+;base64,/, "");
+
+      // 임시 파일 생성
+      const tempUri = FileSystem.documentDirectory + data.filename;
+      await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // 갤러리에 저장
+      const asset = await MediaLibrary.createAssetAsync(tempUri);
+      await MediaLibrary.createAlbumAsync("행운사주", asset, false);
+
+      // 임시 파일 삭제
+      await FileSystem.deleteAsync(tempUri);
+
+      Alert.alert("저장 완료", "이미지가 갤러리에 저장되었습니다.");
+    } catch (error) {
+      console.error("Image save error:", error);
+      Alert.alert("저장 실패", "이미지 저장 중 오류가 발생했습니다.");
+    }
+  };
 
   const handleFullPageCapture = async (data: any) => {
     try {
