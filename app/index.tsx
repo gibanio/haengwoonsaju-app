@@ -1,25 +1,67 @@
-import * as FileSystem from "expo-file-system";
-import * as MediaLibrary from "expo-media-library";
-import * as Print from "expo-print";
-import * as SplashScreen from "expo-splash-screen";
-import { StatusBar as ExpoStatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Platform,
-  SafeAreaView,
-  StatusBar as RNStatusBar,
-} from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import * as FileSystem from 'expo-file-system';
+import * as InAppPurchases from 'expo-in-app-purchases';
+import * as MediaLibrary from 'expo-media-library';
+import * as Print from 'expo-print';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
-import Config from "@/constants/Config";
+import Config from '@/constants/Config';
+import { ProductItem } from '@/constants/Product';
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
+  const formDataRef = useRef<any>(null);
 
   useEffect(() => {
+    initializeIAP();
     RNStatusBar.setBarStyle("dark-content", true);
+
+    // 리스너 등록
+    InAppPurchases.setPurchaseListener(({ responseCode, results }) => {
+      if (responseCode === InAppPurchases.IAPResponseCode.OK && results) {
+        results.forEach(async (purchase) => {
+          if (!purchase.acknowledged) {
+            await InAppPurchases.finishTransactionAsync(purchase, true);
+
+            // 결제 성공 시 웹뷰로 메시지 전송
+            webViewRef.current?.injectJavaScript(`
+            window.postMessage(
+              JSON.stringify({
+                type: 'PURCHASE_SUCCESS',
+                data: { 
+                  formData: ${JSON.stringify(formDataRef.current)},
+                  productId: '${purchase.productId}',
+                }
+              })
+            );
+          `);
+            formDataRef.current = null;
+          }
+        });
+      } else {
+        // 결제 실패 시 웹뷰로 메시지 전송
+        webViewRef.current?.injectJavaScript(`
+        window.postMessage(
+          JSON.stringify({
+            type: 'PURCHASE_FAILED',
+            data: { error: 'Purchase failed' }
+          })
+        );
+      `);
+        formDataRef.current = null;
+      }
+    });
+
+    // 클린업 함수
+    return () => {
+      InAppPurchases.setPurchaseListener(({ responseCode, results }) => {
+        // 빈 리스너
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -32,7 +74,54 @@ export default function Page() {
     SplashScreen.hideAsync();
   };
 
-  const handlePaymentRequest = async (paymentData: any) => {};
+  const initializeIAP = async () => {
+    try {
+      await InAppPurchases.connectAsync();
+
+      if (!ProductItem) {
+        console.error("No products configured");
+        return;
+      }
+
+      await InAppPurchases.getProductsAsync(ProductItem);
+
+      console.log("IAP initialized successfully");
+    } catch (error) {
+      console.error("IAP initialization error:", error);
+    }
+  };
+
+  // handlePaymentRequest 함수 구현
+  const handlePaymentRequest = async (data: any) => {
+    try {
+      const { type, formData } = data;
+      let productId: string;
+      switch (type) {
+        case "newyear":
+          productId = ProductItem[0]; // "NewyearFortune"
+          break;
+        case "work":
+          productId = ProductItem[1]; // "WorkFortune"
+          break;
+        default:
+          throw new Error("Invalid product type");
+      }
+      formDataRef.current = formData;
+      await InAppPurchases.purchaseItemAsync(productId);
+    } catch (error) {
+      console.error("Purchase error:", error);
+      // 요청 자체가 실패한 경우에만 에러 메시지 전송
+      webViewRef.current?.injectJavaScript(`
+      window.postMessage(
+        JSON.stringify({
+          type: 'PURCHASE_ERROR',
+          data: { error: 'Purchase request failed' }
+        })
+      );
+    `);
+      throw error;
+    }
+  };
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
