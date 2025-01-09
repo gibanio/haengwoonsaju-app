@@ -1,15 +1,20 @@
-import * as FileSystem from 'expo-file-system';
-import * as InAppPurchases from 'expo-in-app-purchases';
-import * as MediaLibrary from 'expo-media-library';
-import * as Print from 'expo-print';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import * as FileSystem from "expo-file-system";
+import * as InAppPurchases from "expo-in-app-purchases";
+import * as MediaLibrary from "expo-media-library";
+import * as Print from "expo-print";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Platform,
+  SafeAreaView,
+  StatusBar as RNStatusBar,
+} from "react-native";
+import { WebView, WebViewMessageEvent } from "react-native-webview";
 
-import Config from '@/constants/Config';
-import { ProductItem } from '@/constants/Product';
+import Config from "@/constants/Config";
+import { ProductItem } from "@/constants/Product";
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
@@ -78,14 +83,16 @@ export default function Page() {
     try {
       await InAppPurchases.connectAsync();
 
-      if (!ProductItem) {
-        console.error("No products configured");
+      console.log("Platform:", Platform.OS); // iOS인지 확인
+      console.log("ProductItem array:", ProductItem); // 상품 ID 배열 확인
+
+      if (ProductItem.length === 0) {
+        console.log("ProductItem array is empty");
         return;
       }
 
-      await InAppPurchases.getProductsAsync(ProductItem);
-
-      console.log("IAP initialized successfully");
+      const products = await InAppPurchases.getProductsAsync(ProductItem);
+      console.log("Full products response:", products);
     } catch (error) {
       console.error("IAP initialization error:", error);
     }
@@ -96,17 +103,29 @@ export default function Page() {
     try {
       const { type, formData } = data;
       let productId: string;
+      console.log(type);
       switch (type) {
-        case "newyear":
+        case "NewyearFortune":
           productId = ProductItem[0]; // "NewyearFortune"
           break;
-        case "work":
+        case "WorkFortune":
           productId = ProductItem[1]; // "WorkFortune"
+          break;
+        case "ExamFortune":
+          productId = ProductItem[2]; // "ExamFortune"
+          break;
+        case "LoveFortune":
+          productId = ProductItem[3]; // "LoveFortune"
+          break;
+        case "MatchPremium":
+          productId = ProductItem[4]; // "MatchPremium"
           break;
         default:
           throw new Error("Invalid product type");
       }
       formDataRef.current = formData;
+
+      console.log("productId", productId);
       await InAppPurchases.purchaseItemAsync(productId);
     } catch (error) {
       console.error("Purchase error:", error);
