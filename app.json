@@ -39,7 +39,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      ["react-native-iap"]
     ],
     "experiments": {
       "typedRoutes": true

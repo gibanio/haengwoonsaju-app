@@ -1,20 +1,18 @@
-import * as FileSystem from "expo-file-system";
-import * as InAppPurchases from "expo-in-app-purchases";
-import * as MediaLibrary from "expo-media-library";
-import * as Print from "expo-print";
-import * as SplashScreen from "expo-splash-screen";
-import { StatusBar as ExpoStatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Platform,
-  SafeAreaView,
-  StatusBar as RNStatusBar,
-} from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import * as Print from 'expo-print';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
+import RNIap, {
+    finishTransaction, getProducts, initConnection, ProductPurchase, Purchase, PurchaseError,
+    purchaseErrorListener, purchaseUpdatedListener, requestPurchase, Subscription
+} from 'react-native-iap';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
-import Config from "@/constants/Config";
-import { ProductItem } from "@/constants/Product";
+import Config from '@/constants/Config';
+import { ProductItem } from '@/constants/Product';
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
@@ -25,47 +23,48 @@ export default function Page() {
     initializeIAP();
     RNStatusBar.setBarStyle("dark-content", true);
 
-    // 리스너 등록
-    InAppPurchases.setPurchaseListener(({ responseCode, results }) => {
-      if (responseCode === InAppPurchases.IAPResponseCode.OK && results) {
-        results.forEach(async (purchase) => {
-          if (!purchase.acknowledged) {
-            await InAppPurchases.finishTransactionAsync(purchase, true);
+    // IAP 리스너 설정
+    const purchaseUpdateSubscription = purchaseUpdatedListener(
+      async (purchase: ProductPurchase) => {
+        const receipt = purchase.transactionReceipt;
+        if (receipt) {
+          try {
+            // 구매 완료 처리
+            await finishTransaction({
+              purchase,
+              isConsumable: true,
+            });
 
             // 결제 성공 시 웹뷰로 메시지 전송
             webViewRef.current?.injectJavaScript(`
-            window.postMessage(
-              JSON.stringify({
-                type: 'PURCHASE_SUCCESS',
-                data: { 
-                  formData: ${JSON.stringify(formDataRef.current)},
-                  productId: '${purchase.productId}',
-                }
-              })
-            );
-          `);
+              window.postMessage(
+                JSON.stringify({
+                  type: 'PURCHASE_SUCCESS',
+                  data: { 
+                    formData: ${JSON.stringify(formDataRef.current)},
+                    productId: '${purchase.productId}',
+                  }
+                })
+              );
+            `);
             formDataRef.current = null;
+          } catch (err) {
+            console.warn("구매 완료 처리 실패:", err);
+            handlePurchaseError();
           }
-        });
-      } else {
-        // 결제 실패 시 웹뷰로 메시지 전송
-        webViewRef.current?.injectJavaScript(`
-        window.postMessage(
-          JSON.stringify({
-            type: 'PURCHASE_FAILED',
-            data: { error: 'Purchase failed' }
-          })
-        );
-      `);
-        formDataRef.current = null;
+        }
       }
+    );
+
+    const purchaseErrorSubscription = purchaseErrorListener((error: any) => {
+      console.warn("구매 오류:", error);
+      handlePurchaseError();
     });
 
     // 클린업 함수
     return () => {
-      InAppPurchases.setPurchaseListener(({ responseCode, results }) => {
-        // 빈 리스너
-      });
+      purchaseUpdateSubscription.remove();
+      purchaseErrorSubscription.remove();
     };
   }, []);
 
@@ -81,22 +80,32 @@ export default function Page() {
 
   const initializeIAP = async () => {
     try {
-      await InAppPurchases.connectAsync();
+      const temp = await initConnection();
 
-      console.log("Platform:", Platform.OS); // iOS인지 확인
-      console.log("ProductItem array:", ProductItem); // 상품 ID 배열 확인
-
-      if (ProductItem.length === 0) {
-        console.log("ProductItem array is empty");
-        return;
+      console.log("IAP 초기화 성공:", temp);
+      if (Platform.OS === "android") {
+        await RNIap.flushFailedPurchasesCachedAsPendingAndroid();
       }
 
-      const products = await InAppPurchases.getProductsAsync(ProductItem);
-      console.log("Full products response:", products);
-    } catch (error) {
-      console.error("IAP initialization error:", error);
+      const products = await getProducts({ skus: ProductItem });
+      console.log("Available products:", products);
+    } catch (err) {
+      console.warn("IAP 초기화 실패:", err);
     }
   };
+
+  const handlePurchaseError = useCallback((error?: PurchaseError) => {
+    console.warn("Purchase error:", error);
+    webViewRef.current?.injectJavaScript(`
+      window.postMessage(
+        JSON.stringify({
+          type: 'PURCHASE_FAILED',
+          data: { error: 'Purchase failed' }
+        })
+      );
+    `);
+    formDataRef.current = null;
+  }, []);
 
   // handlePaymentRequest 함수 구현
   const handlePaymentRequest = async (data: any) => {
@@ -124,9 +133,11 @@ export default function Page() {
           throw new Error("Invalid product type");
       }
       formDataRef.current = formData;
-
+      await requestPurchase({
+        sku: productId,
+        andDangerouslyFinishTransactionAutomaticallyIOS: false,
+      });
       console.log("productId", productId);
-      await InAppPurchases.purchaseItemAsync(productId);
     } catch (error) {
       console.error("Purchase error:", error);
       // 요청 자체가 실패한 경우에만 에러 메시지 전송
