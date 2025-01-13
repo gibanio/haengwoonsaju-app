@@ -20,9 +20,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "android": {
-        "permissions": ["WRITE_EXTERNAL_STORAGE", "READ_EXTERNAL_STORAGE"]
-      }
+      "permissions": [
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ],
+      "package": "com.haengwoonsaju"
     },
     "web": {
       "bundler": "metro",
@@ -40,7 +42,7 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      ["react-native-iap"]
+      "react-native-iap"
     ],
     "experiments": {
       "typedRoutes": true
