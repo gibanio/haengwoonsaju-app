@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "com.haengwoonsaju",
     "owner": "gibanio",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "buildNumber": "0.0.1",

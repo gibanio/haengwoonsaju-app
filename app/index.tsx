@@ -1,18 +1,32 @@
-import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
-import * as Print from 'expo-print';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
+import * as Print from "expo-print";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Platform,
+  SafeAreaView,
+  StatusBar as RNStatusBar,
+  View,
+} from "react-native";
 import RNIap, {
-    finishTransaction, getProducts, initConnection, ProductPurchase, Purchase, PurchaseError,
-    purchaseErrorListener, purchaseUpdatedListener, requestPurchase, Subscription
-} from 'react-native-iap';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+  finishTransaction,
+  getProducts,
+  initConnection,
+  ProductPurchase,
+  Purchase,
+  PurchaseError,
+  purchaseErrorListener,
+  purchaseUpdatedListener,
+  requestPurchase,
+  Subscription,
+} from "react-native-iap";
+import { WebView, WebViewMessageEvent } from "react-native-webview";
 
-import Config from '@/constants/Config';
-import { ProductItem } from '@/constants/Product';
+import Config from "@/constants/Config";
+import { ProductItem } from "@/constants/Product";
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,8 +35,8 @@ export default function Page() {
 
   useEffect(() => {
     initializeIAP();
-    RNStatusBar.setBarStyle("dark-content", true);
-
+    /* RNStatusBar.setBarStyle("dark-content", true);
+    RNStatusBar.setBackgroundColor("#F5F5F5", true); */
     // IAP 리스너 설정
     const purchaseUpdateSubscription = purchaseUpdatedListener(
       async (purchase: ProductPurchase) => {
@@ -418,12 +432,38 @@ export default function Page() {
   `;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-      <ExpoStatusBar style="dark" />
+    <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar style="dark" />
+      {/* 상단 섹션 */}
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "50%",
+          backgroundColor: "#F5F5F5",
+        }}
+      />
+
+      {/* 하단 섹션 */}
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: "50%",
+          backgroundColor: "#FFFFFF",
+        }}
+      />
+
       <WebView
         ref={webViewRef}
         source={{ uri: Config.API_HOST }}
-        style={{ flex: 1 }}
+        style={{
+          flex: 1,
+        }}
         onLoadStart={() => setIsLoading(true)}
         onLoadEnd={() => setIsLoading(false)}
         onMessage={handleMessage}
