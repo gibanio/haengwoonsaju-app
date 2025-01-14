@@ -49,23 +49,28 @@ export default function Page() {
               isConsumable: true,
             });
 
-            // 결제 성공 시 웹뷰로 메시지 전송
-            webViewRef.current?.injectJavaScript(`
-              window.postMessage(
-                JSON.stringify({
-                  type: 'PURCHASE_SUCCESS',
-                  data: { 
-                    formData: ${JSON.stringify(formDataRef.current)},
-                    productId: '${purchase.productId}',
-                  }
-                })
-              );
-            `);
+            const message = JSON.stringify({
+              type: "PAYMENT_RESULT",
+              data: {
+                success: true,
+                formData: formDataRef.current,
+                productId: purchase.productId,
+                receipt: receipt,
+                platform: Platform.OS,
+              },
+            });
+
+            webViewRef.current?.injectJavaScript(
+              `window.postMessage('${message}', '*'); 
+              true;`
+            );
             formDataRef.current = null;
           } catch (err) {
             console.warn("구매 완료 처리 실패:", err);
             handlePurchaseError();
           }
+        } else {
+          console.log("test3");
         }
       }
     );
