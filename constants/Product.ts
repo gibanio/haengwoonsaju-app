@@ -9,5 +9,11 @@ export const ProductItem: string[] =
       "LoveFortune",
       "MatchPremium",
     ],
-    android: ["com.yourapp.product1"],
+    android: [
+      "newyearfortune",
+      "workfortune",
+      "examfortune",
+      "lovefortune",
+      "matchpremium",
+    ],
   }) ?? [];
