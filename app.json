@@ -2,7 +2,7 @@
   "expo": {
     "name": "haengwoonsaju",
     "slug": "haengwoonsaju",
-    "version": "0.0.1",
+    "version": "0.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "com.haengwoonsaju",
@@ -10,12 +10,12 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "buildNumber": "0.0.1",
+      "buildNumber": "0.0.3",
       "supportsTablet": true,
       "bundleIdentifier": "com.haengwoonsaju"
     },
     "android": {
-      "versionCode": 1,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"

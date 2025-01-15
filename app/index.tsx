@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import RNIap, {
   finishTransaction,
+  flushFailedPurchasesCachedAsPendingAndroid,
   getProducts,
   initConnection,
   ProductPurchase,
@@ -27,11 +28,14 @@ import { WebView, WebViewMessageEvent } from "react-native-webview";
 
 import Config from "@/constants/Config";
 import { ProductItem } from "@/constants/Product";
+import useLayout from "@/hooks/useLayout";
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
   const formDataRef = useRef<any>(null);
+
+  const { top } = useLayout();
 
   useEffect(() => {
     initializeIAP();
@@ -103,7 +107,7 @@ export default function Page() {
 
       console.log("IAP 초기화 성공:", temp);
       if (Platform.OS === "android") {
-        await RNIap.flushFailedPurchasesCachedAsPendingAndroid();
+        await flushFailedPurchasesCachedAsPendingAndroid();
       }
 
       const products = await getProducts({ skus: ProductItem });
@@ -131,7 +135,6 @@ export default function Page() {
     try {
       const { type, formData } = data;
       let productId: string;
-      console.log(type);
       switch (type) {
         case "NewyearFortune":
           productId = ProductItem[0]; // "NewyearFortune"
@@ -152,10 +155,19 @@ export default function Page() {
           throw new Error("Invalid product type");
       }
       formDataRef.current = formData;
-      await requestPurchase({
-        sku: productId,
-        andDangerouslyFinishTransactionAutomaticallyIOS: false,
-      });
+
+      console.log("productId", productId);
+      if (Platform.OS === "ios") {
+        await requestPurchase({
+          sku: productId,
+          andDangerouslyFinishTransactionAutomaticallyIOS: false,
+        });
+      } else {
+        await requestPurchase({
+          skus: [productId],
+        });
+      }
+
       console.log("productId", productId);
     } catch (error) {
       console.error("Purchase error:", error);
@@ -437,7 +449,9 @@ export default function Page() {
   `;
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView
+      style={{ flex: 1, paddingTop: Platform.OS === "ios" ? 0 : top }}
+    >
       <StatusBar style="dark" />
       {/* 상단 섹션 */}
       <View
@@ -470,7 +484,17 @@ export default function Page() {
           flex: 1,
         }}
         onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => setIsLoading(false)}
+        onLoadEnd={() => {
+          setIsLoading(false);
+          //webview에 메시지 전달
+          webViewRef.current?.injectJavaScript(`
+      window.postMessage(
+        JSON.stringify({
+          type: 'HIDE_BANNER',
+        })
+      );
+    `);
+        }}
         onMessage={handleMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
