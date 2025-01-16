@@ -12,9 +12,12 @@ import {
   View,
 } from "react-native";
 import RNIap, {
+  acknowledgePurchaseAndroid,
+  endConnection,
   finishTransaction,
   flushFailedPurchasesCachedAsPendingAndroid,
   getProducts,
+  getPurchaseHistory,
   initConnection,
   ProductPurchase,
   Purchase,
@@ -22,6 +25,7 @@ import RNIap, {
   purchaseErrorListener,
   purchaseUpdatedListener,
   requestPurchase,
+  RequestPurchaseBaseAndroid,
   Subscription,
 } from "react-native-iap";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
@@ -38,56 +42,85 @@ export default function Page() {
   const { top } = useLayout();
 
   useEffect(() => {
-    initializeIAP();
-    /* RNStatusBar.setBarStyle("dark-content", true);
-    RNStatusBar.setBackgroundColor("#F5F5F5", true); */
-    // IAP 리스너 설정
-    const purchaseUpdateSubscription = purchaseUpdatedListener(
-      async (purchase: ProductPurchase) => {
-        const receipt = purchase.transactionReceipt;
-        if (receipt) {
-          try {
-            // 구매 완료 처리
-            await finishTransaction({
-              purchase,
-              isConsumable: true,
-            });
+    let isSubscribed = true; // 구독 상태 관리
 
-            const message = JSON.stringify({
-              type: "PAYMENT_RESULT",
-              data: {
-                success: true,
-                formData: formDataRef.current,
-                productId: purchase.productId,
-                receipt: receipt,
-                platform: Platform.OS,
-              },
-            });
+    const setupIAP = async () => {
+      if (!isSubscribed) return;
+      // 기존 리스너 제거를 먼저 수행
+      await endConnection();
 
-            webViewRef.current?.injectJavaScript(
-              `window.postMessage('${message}', '*'); 
-              true;`
-            );
-            formDataRef.current = null;
-          } catch (err) {
-            console.warn("구매 완료 처리 실패:", err);
-            handlePurchaseError();
+      await initializeIAP();
+
+      // 새로운 리스너 등록
+      const purchaseUpdateSubscription = purchaseUpdatedListener(
+        async (purchase: ProductPurchase) => {
+          if (!isSubscribed) return;
+
+          const receipt = purchase.transactionReceipt;
+          if (receipt) {
+            try {
+              await finishTransaction({
+                purchase,
+                isConsumable: true,
+              });
+
+              let returnDataForAndroid = null;
+
+              if (Platform.OS === "android") {
+                console.log(purchase);
+                returnDataForAndroid = {
+                  ...purchase,
+                };
+                if (purchase.dataAndroid)
+                  returnDataForAndroid.dataAndroid = JSON.parse(
+                    purchase.dataAndroid
+                  );
+
+                returnDataForAndroid.transactionReceipt = JSON.parse(receipt);
+              }
+
+              const message = JSON.stringify({
+                type: "PAYMENT_RESULT",
+                data: {
+                  success: true,
+                  formData: formDataRef.current,
+                  productId: purchase.productId,
+                  receipt:
+                    Platform.OS === "ios" ? receipt : returnDataForAndroid,
+                  platform: Platform.OS,
+                },
+              });
+
+              webViewRef.current?.injectJavaScript(
+                `window.postMessage('${message}', '*'); true;`
+              );
+              formDataRef.current = null;
+            } catch (err) {
+              console.warn("구매 완료 처리 실패:", err);
+              handlePurchaseError();
+            }
           }
-        } else {
-          console.log("test3");
         }
-      }
-    );
+      );
 
-    const purchaseErrorSubscription = purchaseErrorListener((error: any) => {
-      console.warn("구매 오류:", error);
-      handlePurchaseError();
-    });
+      const purchaseErrorSubscription = purchaseErrorListener((error: any) => {
+        if (!isSubscribed) return;
+        console.warn("구매 오류:", error);
+        handlePurchaseError();
+      });
+
+      return () => {
+        purchaseUpdateSubscription.remove();
+        purchaseErrorSubscription.remove();
+      };
+    };
+
+    setupIAP();
 
     // 클린업 함수
     return () => {
-      purchaseUpdateSubscription.remove();
-      purchaseErrorSubscription.remove();
+      isSubscribed = false;
+      endConnection();
     };
   }, []);
 
@@ -111,6 +144,9 @@ export default function Page() {
       }
 
       const products = await getProducts({ skus: ProductItem });
+
+      const history = await getPurchaseHistory();
+
       console.log("Available products:", products);
     } catch (err) {
       console.warn("IAP 초기화 실패:", err);
@@ -155,8 +191,6 @@ export default function Page() {
           throw new Error("Invalid product type");
       }
       formDataRef.current = formData;
-
-      console.log("productId", productId);
       if (Platform.OS === "ios") {
         await requestPurchase({
           sku: productId,
@@ -167,8 +201,6 @@ export default function Page() {
           skus: [productId],
         });
       }
-
-      console.log("productId", productId);
     } catch (error) {
       console.error("Purchase error:", error);
       // 요청 자체가 실패한 경우에만 에러 메시지 전송
