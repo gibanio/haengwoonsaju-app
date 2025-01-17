@@ -16,7 +16,6 @@
       "bundleIdentifier": "com.haengwoonsaju"
     },
     "android": {
-      "icon": "./assets/images/icon_android.png",
       "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
