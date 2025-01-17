@@ -482,7 +482,7 @@ export default function Page() {
 
   return (
     <SafeAreaView
-      style={{ flex: 1, paddingTop: Platform.OS === "ios" ? 0 : top }}
+      style={{ flex: 1, paddingTop: Platform.OS === "ios" ? 0 : top + 4 }}
     >
       <StatusBar style="dark" />
       {/* 상단 섹션 */}

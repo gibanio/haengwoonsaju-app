@@ -2,7 +2,7 @@
   "expo": {
     "name": "행운사주",
     "slug": "haengwoonsaju",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "com.haengwoonsaju",
@@ -11,13 +11,13 @@
     "newArchEnabled": true,
     "ios": {
       "icon": "./assets/images/icon_ios.png",
-      "buildNumber": "0.0.3",
+      "buildNumber": "0.0.4",
       "supportsTablet": true,
       "bundleIdentifier": "com.haengwoonsaju"
     },
     "android": {
       "icon": "./assets/images/icon_android.png",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
