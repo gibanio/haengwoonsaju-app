@@ -1,38 +1,21 @@
-import * as FileSystem from "expo-file-system";
-import * as MediaLibrary from "expo-media-library";
-import * as Print from "expo-print";
-import * as SplashScreen from "expo-splash-screen";
-import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Platform,
-  SafeAreaView,
-  StatusBar as RNStatusBar,
-  View,
-} from "react-native";
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import * as Print from 'expo-print';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Platform, SafeAreaView, StatusBar as RNStatusBar, View } from 'react-native';
 import RNIap, {
-  acknowledgePurchaseAndroid,
-  endConnection,
-  finishTransaction,
-  flushFailedPurchasesCachedAsPendingAndroid,
-  getProducts,
-  getPurchaseHistory,
-  initConnection,
-  ProductPurchase,
-  Purchase,
-  PurchaseError,
-  purchaseErrorListener,
-  purchaseUpdatedListener,
-  requestPurchase,
-  RequestPurchaseBaseAndroid,
-  Subscription,
-} from "react-native-iap";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+    acknowledgePurchaseAndroid, endConnection, finishTransaction,
+    flushFailedPurchasesCachedAsPendingAndroid, getProducts, getPurchaseHistory, initConnection,
+    ProductPurchase, Purchase, PurchaseError, purchaseErrorListener, purchaseUpdatedListener,
+    requestPurchase, RequestPurchaseBaseAndroid, Subscription
+} from 'react-native-iap';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
-import Config from "@/constants/Config";
-import { ProductItem } from "@/constants/Product";
-import useLayout from "@/hooks/useLayout";
+import Config from '@/constants/Config';
+import { ProductItem } from '@/constants/Product';
+import useLayout from '@/hooks/useLayout';
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);

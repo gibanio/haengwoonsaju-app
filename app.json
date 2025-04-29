@@ -2,7 +2,7 @@
   "expo": {
     "name": "행운사주",
     "slug": "haengwoonsaju",
-    "version": "0.0.9",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "com.haengwoonsaju",
@@ -11,12 +11,12 @@
     "newArchEnabled": true,
     "ios": {
       "icon": "./assets/images/icon_ios.png",
-      "buildNumber": "0.0.9",
+      "buildNumber": "0.1.0",
       "supportsTablet": true,
       "bundleIdentifier": "com.haengwoonsaju"
     },
     "android": {
-      "versionCode": 9,
+      "versionCode": 10,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -44,7 +44,15 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "react-native-iap"
+      "react-native-iap",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

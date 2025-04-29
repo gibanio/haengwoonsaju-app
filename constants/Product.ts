@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { Platform } from 'react-native';
 
 export const ProductItem: string[] =
   Platform.select({
@@ -8,6 +8,7 @@ export const ProductItem: string[] =
       "ExamFortune",
       "LoveFortune",
       "MatchPremium",
+      "Bigfortune",
     ],
     android: [
       "newyearfortune",
@@ -15,5 +16,6 @@ export const ProductItem: string[] =
       "examfortune",
       "lovefortune",
       "matchpremium",
+      "bigfortune",
     ],
   }) ?? [];
