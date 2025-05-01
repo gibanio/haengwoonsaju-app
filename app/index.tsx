@@ -1,21 +1,43 @@
-import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
-import * as Print from 'expo-print';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, SafeAreaView, StatusBar as RNStatusBar, View } from 'react-native';
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
+import * as Print from "expo-print";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Linking,
+  Platform,
+  SafeAreaView,
+  StatusBar as RNStatusBar,
+  View,
+} from "react-native";
 import RNIap, {
-    acknowledgePurchaseAndroid, endConnection, finishTransaction,
-    flushFailedPurchasesCachedAsPendingAndroid, getProducts, getPurchaseHistory, initConnection,
-    ProductPurchase, Purchase, PurchaseError, purchaseErrorListener, purchaseUpdatedListener,
-    requestPurchase, RequestPurchaseBaseAndroid, Subscription
-} from 'react-native-iap';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+  acknowledgePurchaseAndroid,
+  endConnection,
+  finishTransaction,
+  flushFailedPurchasesCachedAsPendingAndroid,
+  getProducts,
+  getPurchaseHistory,
+  initConnection,
+  ProductPurchase,
+  Purchase,
+  PurchaseError,
+  purchaseErrorListener,
+  purchaseUpdatedListener,
+  requestPurchase,
+  RequestPurchaseBaseAndroid,
+  Subscription,
+} from "react-native-iap";
+import {
+  WebView,
+  WebViewMessageEvent,
+  WebViewNavigation,
+} from "react-native-webview";
 
-import Config from '@/constants/Config';
-import { ProductItem } from '@/constants/Product';
-import useLayout from '@/hooks/useLayout';
+import Config from "@/constants/Config";
+import { ProductItem } from "@/constants/Product";
+import useLayout from "@/hooks/useLayout";
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
@@ -169,6 +191,9 @@ export default function Page() {
           break;
         case "MatchPremium":
           productId = ProductItem[4]; // "MatchPremium"
+          break;
+        case "Bigfortune":
+          productId = ProductItem[5]; // "Bigfortune"
           break;
         default:
           throw new Error("Invalid product type");
@@ -425,6 +450,17 @@ export default function Page() {
     }
   };
 
+  const handleShouldStartLoadWithRequest = (
+    request: WebViewNavigation
+  ): boolean => {
+    // 인스타그램 링크만 외부 브라우저로 열기
+    if (request.url.includes("instagram.com")) {
+      Linking.openURL(request.url);
+      return false; // WebView 로딩 중지
+    }
+    return true; // 인스타그램 외의 모든 URL은 웹뷰에서 계속 로드
+  };
+
   const startCapture = () => {
     webViewRef.current?.injectJavaScript(captureFullPageScript);
   };
@@ -519,6 +555,7 @@ export default function Page() {
         scalesPageToFit={false}
         scrollEnabled={true}
         contentMode="mobile"
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
       />
     </SafeAreaView>
   );
