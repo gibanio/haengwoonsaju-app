@@ -72,7 +72,6 @@ export default function Page() {
               let returnDataForAndroid = null;
 
               if (Platform.OS === "android") {
-                console.log(purchase);
                 returnDataForAndroid = {
                   ...purchase,
                 };
@@ -142,8 +141,6 @@ export default function Page() {
   const initializeIAP = async () => {
     try {
       const temp = await initConnection();
-
-      console.log("IAP 초기화 성공:", temp);
       if (Platform.OS === "android") {
         await flushFailedPurchasesCachedAsPendingAndroid();
       }
@@ -151,8 +148,6 @@ export default function Page() {
       const products = await getProducts({ skus: ProductItem });
 
       const history = await getPurchaseHistory();
-
-      console.log("Available products:", products);
     } catch (err) {
       console.warn("IAP 초기화 실패:", err);
     }
