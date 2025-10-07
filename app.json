@@ -2,7 +2,7 @@
   "expo": {
     "name": "행운사주",
     "slug": "haengwoonsaju",
-    "version": "1.0.2",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "com.haengwoonsaju",
@@ -11,20 +11,69 @@
     "newArchEnabled": true,
     "ios": {
       "icon": "./assets/images/icon_ios.png",
-      "buildNumber": "1.0.2",
+      "buildNumber": "2.0.0",
       "supportsTablet": true,
       "bundleIdentifier": "com.haengwoonsaju",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "운세풀이 결과를 이미지로 저장하기위해 라이브러리 접근권한동의가 필요합니다. 설정에서 이를 변경할 수 있습니다."
+        "NSPhotoLibraryUsageDescription": "운세풀이 결과를 이미지로 저장하기위해 라이브러리 접근권한동의가 필요합니다. 설정에서 이를 변경할 수 있습니다.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "kftc-bankpay",
+          "ispmobile",
+          "hdcardappcardansimclick",
+          "smhyundaiansimclick",
+          "shinhan-sr-ansimclick",
+          "kb-acp",
+          "kbbank",
+          "mpocket.online.ansimclick",
+          "lottesmartpay",
+          "lotteappcard",
+          "cloudpay",
+          "nhappcardansimclick",
+          "citispay",
+          "citicardappkr",
+          "citimobileapp",
+          "supertoss",
+          "kakaotalk",
+          "kakaopay",
+          "toss",
+          "payco",
+          "lguthepay",
+          "lpayapp",
+          "wooripay",
+          "nhallonepayansimclick",
+          "hanawalletmembers",
+          "pass",
+          "smshinhanansimclick",
+          "liivbank",
+          "naversearchapp",
+          "naversearchthirdlogin"
+        ],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "5hshop.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            },
+            "haengwoonsaju.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
       }
     },
     "android": {
-      "versionCode": 102,
+      "versionCode": 200,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_EXTERNAL_STORAGE"
@@ -55,7 +104,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/withAndroidQueries"
     ],
     "experiments": {
       "typedRoutes": true
@@ -64,6 +114,12 @@
       "eas": {
         "projectId": "694d5db0-edbc-49af-9d99-4ec261d5c4ef"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/694d5db0-edbc-49af-9d99-4ec261d5c4ef"
     }
   }
 }

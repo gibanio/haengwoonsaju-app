@@ -6,14 +6,19 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const getVisibleScreenSize = () => {
-  const window = Dimensions.get("window");
+const useLayout = () => {
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+
+  const statusBarHeight =
+    Platform.OS === "ios" ? 0 : StatusBar.currentHeight || 0;
+
+  // Calculate visible screen size
+  const window = Dimensions.get("window");
   const screenHeight = Dimensions.get("screen").height;
   const windowHeight = Dimensions.get("window").height;
 
   let bottomTabBarHeight = 50;
-  let statusBarHeight = 0;
   let navigationBarHeight = 0;
   let visibleWidth = window.width;
   let visibleHeight = windowHeight;
@@ -27,7 +32,6 @@ const getVisibleScreenSize = () => {
 
     visibleHeight = visibleHeight - bottomTabBarHeight;
   } else {
-    statusBarHeight = insets.top;
     navigationBarHeight =
       insets.bottom === 0
         ? screenHeight - windowHeight - insets.top
@@ -42,25 +46,10 @@ const getVisibleScreenSize = () => {
   }
 
   return {
-    visibleWidth: visibleWidth,
-    visibleHeight: visibleHeight,
-  };
-};
-
-const useLayout = () => {
-  const { width, height } = useWindowDimensions();
-  const { top, bottom } = useSafeAreaInsets();
-
-  const statusBarHeight =
-    Platform.OS === "ios" ? 0 : StatusBar.currentHeight || 0;
-
-  const { visibleWidth, visibleHeight } = getVisibleScreenSize();
-
-  return {
     width,
     height,
-    top,
-    bottom,
+    top: insets.top,
+    bottom: insets.bottom,
     statusBarHeight,
     visibleWidth,
     visibleHeight,
