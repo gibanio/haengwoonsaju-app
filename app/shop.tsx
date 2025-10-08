@@ -1,5 +1,6 @@
+import { useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Alert,
   BackHandler,
@@ -24,27 +25,75 @@ export default function ShopPage() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [popupUrl, setPopupUrl] = useState<string | null>(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
+  const [shouldShowTabBar, setShouldShowTabBar] = useState(true);
   const webViewRef = useRef<WebView>(null);
+  const navigation = useNavigation();
 
   const { top } = useLayout();
 
+  // 오행샵 메인 페이지 체크 함수
+  const isMainPage = (url: string): boolean => {
+    // 메인 페이지 패턴: 5hshop.com/ 또는 m.5hshop.com/ (쿼리 파라미터 제외)
+    const mainPagePattern = /^https:\/\/(m\.)?5hshop\.com\/?(\?.*)?$/;
+    return mainPagePattern.test(url);
+  };
+
+  // 탭바 표시/숨김 제어
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: shouldShowTabBar
+        ? {
+            backgroundColor: "#FFFFFF",
+            borderTopColor: "#E5E7EB",
+            borderTopWidth: 1,
+            height: Platform.OS === "ios" ? 92 : 72,
+            paddingBottom: Platform.OS === "ios" ? 24 : 12,
+            paddingTop: 8,
+          }
+        : { display: "none" },
+    });
+  }, [shouldShowTabBar, navigation]);
+
   // 앱 스키마 목록 (결제, 간편결제, 본인인증 등)
   const APP_SCHEMES = [
-    'kftc-bankpay', 'ispmobile', 'hdcardappcardansimclick', 'smhyundaiansimclick',
-    'shinhan-sr-ansimclick', 'kb-acp', 'kbbank', 'mpocket.online.ansimclick',
-    'lottesmartpay', 'lotteappcard', 'cloudpay', 'nhappcardansimclick',
-    'citispay', 'citicardappkr', 'citimobileapp', 'supertoss', 'kakaotalk',
-    'kakaopay', 'toss', 'payco', 'lguthepay', 'lpayapp', 'wooripay',
-    'nhallonepayansimclick', 'hanawalletmembers', 'pass', 'smshinhanansimclick',
-    'liivbank', 'naversearchapp', 'naversearchthirdlogin',
+    "kftc-bankpay",
+    "ispmobile",
+    "hdcardappcardansimclick",
+    "smhyundaiansimclick",
+    "shinhan-sr-ansimclick",
+    "kb-acp",
+    "kbbank",
+    "mpocket.online.ansimclick",
+    "lottesmartpay",
+    "lotteappcard",
+    "cloudpay",
+    "nhappcardansimclick",
+    "citispay",
+    "citicardappkr",
+    "citimobileapp",
+    "supertoss",
+    "kakaotalk",
+    "kakaopay",
+    "toss",
+    "payco",
+    "lguthepay",
+    "lpayapp",
+    "wooripay",
+    "nhallonepayansimclick",
+    "hanawalletmembers",
+    "pass",
+    "smshinhanansimclick",
+    "liivbank",
+    "naversearchapp",
+    "naversearchthirdlogin",
   ];
 
   const isAppScheme = (url: string): boolean => {
-    return APP_SCHEMES.some(scheme => url.startsWith(`${scheme}://`));
+    return APP_SCHEMES.some((scheme) => url.startsWith(`${scheme}://`));
   };
 
   const handleIntentUrl = async (intentUrl: string) => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== "android") return;
 
     try {
       // Intent URL 파싱
@@ -54,7 +103,7 @@ export default function ShopPage() {
 
       if (scheme) {
         // Intent URL을 앱 스키마로 변환
-        const appSchemeUrl = intentUrl.replace('intent://', `${scheme}://`);
+        const appSchemeUrl = intentUrl.replace("intent://", `${scheme}://`);
 
         try {
           const canOpen = await Linking.canOpenURL(appSchemeUrl);
@@ -65,16 +114,16 @@ export default function ShopPage() {
             const marketUrl = `market://details?id=${packageName}`;
             await Linking.openURL(marketUrl);
           } else {
-            Alert.alert('알림', '해당 앱이 설치되어 있지 않습니다.');
+            Alert.alert("알림", "해당 앱이 설치되어 있지 않습니다.");
           }
         } catch (e) {
-          console.error('Intent URL 실행 실패:', e);
-          Alert.alert('오류', '앱 실행에 실패했습니다.');
+          console.error("Intent URL 실행 실패:", e);
+          Alert.alert("오류", "앱 실행에 실패했습니다.");
         }
       }
     } catch (error) {
-      console.error('Intent URL 처리 실패:', error);
-      Alert.alert('오류', '앱 실행에 실패했습니다.');
+      console.error("Intent URL 처리 실패:", error);
+      Alert.alert("오류", "앱 실행에 실패했습니다.");
     }
   };
 
@@ -84,11 +133,11 @@ export default function ShopPage() {
       if (canOpen) {
         await Linking.openURL(url);
       } else {
-        Alert.alert('알림', '해당 앱이 설치되어 있지 않습니다.');
+        Alert.alert("알림", "해당 앱이 설치되어 있지 않습니다.");
       }
     } catch (error) {
-      console.error('앱 스키마 실행 실패:', error);
-      Alert.alert('오류', '앱 실행에 실패했습니다.');
+      console.error("앱 스키마 실행 실패:", error);
+      Alert.alert("오류", "앱 실행에 실패했습니다.");
     }
   };
 
@@ -114,12 +163,16 @@ export default function ShopPage() {
     console.log("[Shop] Loading URL:", url);
 
     // HTTP/HTTPS - 웹뷰에서 계속 로드
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('about:blank')) {
+    if (
+      url.startsWith("http://") ||
+      url.startsWith("https://") ||
+      url.startsWith("about:blank")
+    ) {
       return true;
     }
 
     // Intent URL 처리 (Android PG 결제)
-    if (url.startsWith('intent://')) {
+    if (url.startsWith("intent://")) {
       handleIntentUrl(url);
       return false;
     }
@@ -131,20 +184,28 @@ export default function ShopPage() {
     }
 
     // 전화, SMS, 메일
-    if (url.startsWith('tel:') || url.startsWith('sms:') || url.startsWith('mailto:')) {
+    if (
+      url.startsWith("tel:") ||
+      url.startsWith("sms:") ||
+      url.startsWith("mailto:")
+    ) {
       Linking.openURL(url);
       return false;
     }
 
     // 인스타그램 등 SNS 링크
-    if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com')) {
+    if (
+      url.includes("instagram.com") ||
+      url.includes("facebook.com") ||
+      url.includes("twitter.com")
+    ) {
       Linking.openURL(url);
       return false;
     }
 
     // 기타 외부 URL은 외부 브라우저에서 열기
-    Linking.openURL(url).catch(err => {
-      console.error('Failed to open URL:', err);
+    Linking.openURL(url).catch((err) => {
+      console.error("Failed to open URL:", err);
     });
 
     return false;
@@ -154,7 +215,7 @@ export default function ShopPage() {
     const { nativeEvent } = syntheticEvent;
     const targetUrl = nativeEvent.targetUrl;
 
-    console.log('[Shop] Open new window:', targetUrl);
+    console.log("[Shop] Open new window:", targetUrl);
 
     if (targetUrl) {
       setPopupUrl(targetUrl);
@@ -164,6 +225,14 @@ export default function ShopPage() {
 
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);
+
+    const currentUrl = navState.url;
+    console.log("[Shop] Current URL:", currentUrl);
+
+    // 메인 페이지 여부에 따라 탭바 표시/숨김
+    const showTabBar = isMainPage(currentUrl);
+    console.log("[Shop] Is main page:", showTabBar);
+    setShouldShowTabBar(showTabBar);
   };
 
   const handleFileDownload = async ({ nativeEvent }: { nativeEvent: any }) => {
@@ -172,20 +241,23 @@ export default function ShopPage() {
     try {
       await Linking.openURL(downloadUrl);
     } catch (error) {
-      console.error('파일 다운로드 실패:', error);
-      Alert.alert('오류', '파일 다운로드에 실패했습니다.');
+      console.error("파일 다운로드 실패:", error);
+      Alert.alert("오류", "파일 다운로드에 실패했습니다.");
     }
   };
 
   // 하드웨어 뒤로가기 버튼 처리 (Android)
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (canGoBack && webViewRef.current) {
-        webViewRef.current.goBack();
-        return true;
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (canGoBack && webViewRef.current) {
+          webViewRef.current.goBack();
+          return true;
+        }
+        return false;
       }
-      return false;
-    });
+    );
 
     return () => backHandler.remove();
   }, [canGoBack]);
@@ -230,7 +302,7 @@ export default function ShopPage() {
           left: 0,
           right: 0,
           height: "50%",
-          backgroundColor: "#F5F5F5",
+          backgroundColor: "#FFFFFF",
         }}
       />
 
@@ -283,7 +355,7 @@ export default function ShopPage() {
         scalesPageToFit={false}
         scrollEnabled={true}
         contentMode="mobile"
-        originWhitelist={['*']}
+        originWhitelist={["*"]}
       />
 
       {/* 팝업 모달 */}
@@ -293,21 +365,21 @@ export default function ShopPage() {
         onRequestClose={() => setIsPopupVisible(false)}
         transparent={false}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
           <View
             style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
               padding: 16,
               borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              backgroundColor: 'white',
+              borderBottomColor: "#E5E5E5",
+              backgroundColor: "white",
             }}
           >
-            <Text style={{ fontSize: 16, fontWeight: 'bold' }}>팝업</Text>
+            <Text style={{ fontSize: 16, fontWeight: "bold" }}>팝업</Text>
             <TouchableOpacity onPress={() => setIsPopupVisible(false)}>
-              <Text style={{ fontSize: 24, color: '#666' }}>✕</Text>
+              <Text style={{ fontSize: 24, color: "#666" }}>✕</Text>
             </TouchableOpacity>
           </View>
           {popupUrl && (
@@ -315,7 +387,7 @@ export default function ShopPage() {
               source={{ uri: popupUrl }}
               javaScriptEnabled={true}
               domStorageEnabled={true}
-              originWhitelist={['*']}
+              originWhitelist={["*"]}
               onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
               style={{ flex: 1 }}
             />

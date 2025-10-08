@@ -64,8 +64,8 @@ export default function RootLayout() {
             backgroundColor: "#FFFFFF",
             borderTopColor: "#E5E7EB",
             borderTopWidth: 1,
-            height: Platform.OS === "ios" ? 88 : 68,
-            paddingBottom: Platform.OS === "ios" ? 20 : 8,
+            height: Platform.OS === "ios" ? 92 : 72,
+            paddingBottom: Platform.OS === "ios" ? 24 : 12,
             paddingTop: 8,
           },
           tabBarLabelStyle: {

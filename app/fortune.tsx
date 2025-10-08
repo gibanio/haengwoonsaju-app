@@ -1,5 +1,6 @@
+import { useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Linking, Platform, SafeAreaView, View } from "react-native";
 import {
   WebView,
@@ -12,9 +13,29 @@ import useLayout from "@/hooks/useLayout";
 
 export default function FortunePage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUrl, setCurrentUrl] = useState<string>(WEBVIEW_URLS.FORTUNE);
   const webViewRef = useRef<WebView>(null);
+  const navigation = useNavigation();
 
   const { top } = useLayout();
+
+  // 탭바 재클릭 시 메인 페이지로 이동
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress" as any, (e) => {
+      console.log("[Fortune] Tab pressed, current URL:", currentUrl);
+
+      // 메인 페이지가 아닌 경우에만 메인으로 이동
+      if (currentUrl !== WEBVIEW_URLS.FORTUNE && webViewRef.current) {
+        console.log("[Fortune] Redirecting to main page");
+        webViewRef.current.injectJavaScript(`
+          window.location.href = '${WEBVIEW_URLS.FORTUNE}';
+          true;
+        `);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, currentUrl]);
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
@@ -39,6 +60,11 @@ export default function FortunePage() {
       return false; // WebView 로딩 중지
     }
     return true; // 인스타그램 외의 모든 URL은 웹뷰에서 계속 로드
+  };
+
+  const handleNavigationStateChange = (navState: WebViewNavigation) => {
+    setCurrentUrl(navState.url);
+    console.log("[Fortune] Current URL:", navState.url);
   };
 
   const injectScript = `
@@ -108,6 +134,7 @@ export default function FortunePage() {
           setIsLoading(false);
         }}
         onMessage={handleMessage}
+        onNavigationStateChange={handleNavigationStateChange}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         bounces={false}

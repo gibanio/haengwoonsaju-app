@@ -31,21 +31,44 @@ export default function MyPage() {
 
   // 앱 스키마 목록 (결제, 간편결제, 본인인증 등)
   const APP_SCHEMES = [
-    'kftc-bankpay', 'ispmobile', 'hdcardappcardansimclick', 'smhyundaiansimclick',
-    'shinhan-sr-ansimclick', 'kb-acp', 'kbbank', 'mpocket.online.ansimclick',
-    'lottesmartpay', 'lotteappcard', 'cloudpay', 'nhappcardansimclick',
-    'citispay', 'citicardappkr', 'citimobileapp', 'supertoss', 'kakaotalk',
-    'kakaopay', 'toss', 'payco', 'lguthepay', 'lpayapp', 'wooripay',
-    'nhallonepayansimclick', 'hanawalletmembers', 'pass', 'smshinhanansimclick',
-    'liivbank', 'naversearchapp', 'naversearchthirdlogin',
+    "kftc-bankpay",
+    "ispmobile",
+    "hdcardappcardansimclick",
+    "smhyundaiansimclick",
+    "shinhan-sr-ansimclick",
+    "kb-acp",
+    "kbbank",
+    "mpocket.online.ansimclick",
+    "lottesmartpay",
+    "lotteappcard",
+    "cloudpay",
+    "nhappcardansimclick",
+    "citispay",
+    "citicardappkr",
+    "citimobileapp",
+    "supertoss",
+    "kakaotalk",
+    "kakaopay",
+    "toss",
+    "payco",
+    "lguthepay",
+    "lpayapp",
+    "wooripay",
+    "nhallonepayansimclick",
+    "hanawalletmembers",
+    "pass",
+    "smshinhanansimclick",
+    "liivbank",
+    "naversearchapp",
+    "naversearchthirdlogin",
   ];
 
   const isAppScheme = (url: string): boolean => {
-    return APP_SCHEMES.some(scheme => url.startsWith(`${scheme}://`));
+    return APP_SCHEMES.some((scheme) => url.startsWith(`${scheme}://`));
   };
 
   const handleIntentUrl = async (intentUrl: string) => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== "android") return;
 
     try {
       // Intent URL 파싱
@@ -55,7 +78,7 @@ export default function MyPage() {
 
       if (scheme) {
         // Intent URL을 앱 스키마로 변환
-        const appSchemeUrl = intentUrl.replace('intent://', `${scheme}://`);
+        const appSchemeUrl = intentUrl.replace("intent://", `${scheme}://`);
 
         try {
           const canOpen = await Linking.canOpenURL(appSchemeUrl);
@@ -66,16 +89,16 @@ export default function MyPage() {
             const marketUrl = `market://details?id=${packageName}`;
             await Linking.openURL(marketUrl);
           } else {
-            Alert.alert('알림', '해당 앱이 설치되어 있지 않습니다.');
+            Alert.alert("알림", "해당 앱이 설치되어 있지 않습니다.");
           }
         } catch (e) {
-          console.error('Intent URL 실행 실패:', e);
-          Alert.alert('오류', '앱 실행에 실패했습니다.');
+          console.error("Intent URL 실행 실패:", e);
+          Alert.alert("오류", "앱 실행에 실패했습니다.");
         }
       }
     } catch (error) {
-      console.error('Intent URL 처리 실패:', error);
-      Alert.alert('오류', '앱 실행에 실패했습니다.');
+      console.error("Intent URL 처리 실패:", error);
+      Alert.alert("오류", "앱 실행에 실패했습니다.");
     }
   };
 
@@ -85,11 +108,11 @@ export default function MyPage() {
       if (canOpen) {
         await Linking.openURL(url);
       } else {
-        Alert.alert('알림', '해당 앱이 설치되어 있지 않습니다.');
+        Alert.alert("알림", "해당 앱이 설치되어 있지 않습니다.");
       }
     } catch (error) {
-      console.error('앱 스키마 실행 실패:', error);
-      Alert.alert('오류', '앱 실행에 실패했습니다.');
+      console.error("앱 스키마 실행 실패:", error);
+      Alert.alert("오류", "앱 실행에 실패했습니다.");
     }
   };
 
@@ -115,12 +138,16 @@ export default function MyPage() {
     console.log("[MyPage] Loading URL:", url);
 
     // HTTP/HTTPS - 웹뷰에서 계속 로드
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('about:blank')) {
+    if (
+      url.startsWith("http://") ||
+      url.startsWith("https://") ||
+      url.startsWith("about:blank")
+    ) {
       return true;
     }
 
     // Intent URL 처리 (Android PG 결제)
-    if (url.startsWith('intent://')) {
+    if (url.startsWith("intent://")) {
       handleIntentUrl(url);
       return false;
     }
@@ -132,20 +159,28 @@ export default function MyPage() {
     }
 
     // 전화, SMS, 메일
-    if (url.startsWith('tel:') || url.startsWith('sms:') || url.startsWith('mailto:')) {
+    if (
+      url.startsWith("tel:") ||
+      url.startsWith("sms:") ||
+      url.startsWith("mailto:")
+    ) {
       Linking.openURL(url);
       return false;
     }
 
     // 인스타그램 등 SNS 링크
-    if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com')) {
+    if (
+      url.includes("instagram.com") ||
+      url.includes("facebook.com") ||
+      url.includes("twitter.com")
+    ) {
       Linking.openURL(url);
       return false;
     }
 
     // 기타 외부 URL은 외부 브라우저에서 열기
-    Linking.openURL(url).catch(err => {
-      console.error('Failed to open URL:', err);
+    Linking.openURL(url).catch((err) => {
+      console.error("Failed to open URL:", err);
     });
 
     return false;
@@ -155,7 +190,7 @@ export default function MyPage() {
     const { nativeEvent } = syntheticEvent;
     const targetUrl = nativeEvent.targetUrl;
 
-    console.log('[MyPage] Open new window:', targetUrl);
+    console.log("[MyPage] Open new window:", targetUrl);
 
     if (targetUrl) {
       setPopupUrl(targetUrl);
@@ -169,21 +204,22 @@ export default function MyPage() {
     const currentUrl = navState.url;
 
     // 마이페이지에서 로그인 페이지로 리다이렉트된 경우
-    if (currentUrl.includes('/member/login.php') && !hasRedirectedToLogin) {
+    if (currentUrl.includes("/member/login.php") && !hasRedirectedToLogin) {
       setHasRedirectedToLogin(true);
-      console.log('[MyPage] 로그인 페이지로 리다이렉트됨');
+      console.log("[MyPage] 로그인 페이지로 리다이렉트됨");
     }
 
     // 로그인 완료 후 홈페이지로 리다이렉트된 경우 -> 마이페이지로 재이동
     // m.5hshop.com (모바일) 또는 5hshop.com (데스크톱) 모두 처리
-    if (hasRedirectedToLogin && (
-      currentUrl === 'https://m.5hshop.com/' ||
-      currentUrl === 'https://5hshop.com/' ||
-      currentUrl === 'https://m.5hshop.com/main/index.php' ||
-      currentUrl === 'https://5hshop.com/main/index.php' ||
-      currentUrl.includes('/main/')
-    )) {
-      console.log('[MyPage] 로그인 완료 감지, 마이페이지로 리다이렉트');
+    if (
+      hasRedirectedToLogin &&
+      (currentUrl === "https://m.5hshop.com/" ||
+        currentUrl === "https://5hshop.com/" ||
+        currentUrl === "https://m.5hshop.com/main/index.php" ||
+        currentUrl === "https://5hshop.com/main/index.php" ||
+        currentUrl.includes("/main/"))
+    ) {
+      console.log("[MyPage] 로그인 완료 감지, 마이페이지로 리다이렉트");
       setHasRedirectedToLogin(false);
       webViewRef.current?.injectJavaScript(`
         window.location.href = '${WEBVIEW_URLS.MYPAGE}';
@@ -192,8 +228,8 @@ export default function MyPage() {
     }
 
     // 로그인 후 마이페이지로 직접 돌아온 경우
-    if (hasRedirectedToLogin && currentUrl.includes('/mypage/')) {
-      console.log('[MyPage] 로그인 완료 후 마이페이지로 복귀');
+    if (hasRedirectedToLogin && currentUrl.includes("/mypage/")) {
+      console.log("[MyPage] 로그인 완료 후 마이페이지로 복귀");
       setHasRedirectedToLogin(false);
     }
   };
@@ -204,20 +240,23 @@ export default function MyPage() {
     try {
       await Linking.openURL(downloadUrl);
     } catch (error) {
-      console.error('파일 다운로드 실패:', error);
-      Alert.alert('오류', '파일 다운로드에 실패했습니다.');
+      console.error("파일 다운로드 실패:", error);
+      Alert.alert("오류", "파일 다운로드에 실패했습니다.");
     }
   };
 
   // 하드웨어 뒤로가기 버튼 처리 (Android)
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (canGoBack && webViewRef.current) {
-        webViewRef.current.goBack();
-        return true;
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (canGoBack && webViewRef.current) {
+          webViewRef.current.goBack();
+          return true;
+        }
+        return false;
       }
-      return false;
-    });
+    );
 
     return () => backHandler.remove();
   }, [canGoBack]);
@@ -262,7 +301,7 @@ export default function MyPage() {
           left: 0,
           right: 0,
           height: "50%",
-          backgroundColor: "#F5F5F5",
+          backgroundColor: "#FFFFFF",
         }}
       />
 
@@ -315,7 +354,7 @@ export default function MyPage() {
         scalesPageToFit={false}
         scrollEnabled={true}
         contentMode="mobile"
-        originWhitelist={['*']}
+        originWhitelist={["*"]}
       />
 
       {/* 팝업 모달 */}
@@ -325,21 +364,21 @@ export default function MyPage() {
         onRequestClose={() => setIsPopupVisible(false)}
         transparent={false}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
           <View
             style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
               padding: 16,
               borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              backgroundColor: 'white',
+              borderBottomColor: "#E5E5E5",
+              backgroundColor: "white",
             }}
           >
-            <Text style={{ fontSize: 16, fontWeight: 'bold' }}>팝업</Text>
+            <Text style={{ fontSize: 16, fontWeight: "bold" }}>팝업</Text>
             <TouchableOpacity onPress={() => setIsPopupVisible(false)}>
-              <Text style={{ fontSize: 24, color: '#666' }}>✕</Text>
+              <Text style={{ fontSize: 24, color: "#666" }}>✕</Text>
             </TouchableOpacity>
           </View>
           {popupUrl && (
@@ -347,7 +386,7 @@ export default function MyPage() {
               source={{ uri: popupUrl }}
               javaScriptEnabled={true}
               domStorageEnabled={true}
-              originWhitelist={['*']}
+              originWhitelist={["*"]}
               onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
               style={{ flex: 1 }}
             />
