@@ -1,3 +1,4 @@
+import { useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -6,11 +7,11 @@ import {
   Linking,
   Modal,
   Platform,
-  SafeAreaView,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   WebView,
   WebViewMessageEvent,
@@ -25,9 +26,29 @@ export default function MyPage() {
   const [popupUrl, setPopupUrl] = useState<string | null>(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [hasRedirectedToLogin, setHasRedirectedToLogin] = useState(false);
+  const [currentUrl, setCurrentUrl] = useState<string>(WEBVIEW_URLS.MYPAGE);
   const webViewRef = useRef<WebView>(null);
+  const navigation = useNavigation();
 
   const { top } = useLayout();
+
+  // 탭바 재클릭 시 메인 페이지로 이동
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress" as any, (e) => {
+      console.log("[MyPage] Tab pressed, current URL:", currentUrl);
+
+      // 메인 페이지가 아닌 경우에만 메인으로 이동
+      if (currentUrl !== WEBVIEW_URLS.MYPAGE && webViewRef.current) {
+        console.log("[MyPage] Redirecting to main page");
+        webViewRef.current.injectJavaScript(`
+          window.location.href = '${WEBVIEW_URLS.MYPAGE}';
+          true;
+        `);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, currentUrl]);
 
   // 앱 스키마 목록 (결제, 간편결제, 본인인증 등)
   const APP_SCHEMES = [
@@ -201,10 +222,11 @@ export default function MyPage() {
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);
 
-    const currentUrl = navState.url;
+    const newUrl = navState.url;
+    setCurrentUrl(newUrl);
 
     // 마이페이지에서 로그인 페이지로 리다이렉트된 경우
-    if (currentUrl.includes("/member/login.php") && !hasRedirectedToLogin) {
+    if (newUrl.includes("/member/login.php") && !hasRedirectedToLogin) {
       setHasRedirectedToLogin(true);
       console.log("[MyPage] 로그인 페이지로 리다이렉트됨");
     }
@@ -213,11 +235,11 @@ export default function MyPage() {
     // m.5hshop.com (모바일) 또는 5hshop.com (데스크톱) 모두 처리
     if (
       hasRedirectedToLogin &&
-      (currentUrl === "https://m.5hshop.com/" ||
-        currentUrl === "https://5hshop.com/" ||
-        currentUrl === "https://m.5hshop.com/main/index.php" ||
-        currentUrl === "https://5hshop.com/main/index.php" ||
-        currentUrl.includes("/main/"))
+      (newUrl === "https://m.5hshop.com/" ||
+        newUrl === "https://5hshop.com/" ||
+        newUrl === "https://m.5hshop.com/main/index.php" ||
+        newUrl === "https://5hshop.com/main/index.php" ||
+        newUrl.includes("/main/"))
     ) {
       console.log("[MyPage] 로그인 완료 감지, 마이페이지로 리다이렉트");
       setHasRedirectedToLogin(false);
@@ -228,7 +250,7 @@ export default function MyPage() {
     }
 
     // 로그인 후 마이페이지로 직접 돌아온 경우
-    if (hasRedirectedToLogin && currentUrl.includes("/mypage/")) {
+    if (hasRedirectedToLogin && newUrl.includes("/mypage/")) {
       console.log("[MyPage] 로그인 완료 후 마이페이지로 복귀");
       setHasRedirectedToLogin(false);
     }
@@ -288,9 +310,7 @@ export default function MyPage() {
   `;
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, paddingTop: Platform.OS === "ios" ? 0 : top + 4 }}
-    >
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <StatusBar style="dark" />
 
       {/* 상단 섹션 */}

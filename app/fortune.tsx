@@ -1,48 +1,298 @@
 import { useNavigation } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
+import * as Print from "expo-print";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
-import { Linking, Platform, SafeAreaView, View } from "react-native";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Alert, Linking, Platform, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  endConnection,
+  finishTransaction,
+  flushFailedPurchasesCachedAsPendingAndroid,
+  getProducts,
+  getPurchaseHistory,
+  initConnection,
+  ProductPurchase,
+  PurchaseError,
+  purchaseErrorListener,
+  purchaseUpdatedListener,
+  requestPurchase,
+} from "react-native-iap";
 import {
   WebView,
   WebViewMessageEvent,
   WebViewNavigation,
 } from "react-native-webview";
 
+import { ProductItem } from "@/constants/Product";
 import { WEBVIEW_URLS } from "@/constants/WebViewUrls";
 import useLayout from "@/hooks/useLayout";
 
 export default function FortunePage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [shouldShowTabBar, setShouldShowTabBar] = useState(true);
   const [currentUrl, setCurrentUrl] = useState<string>(WEBVIEW_URLS.FORTUNE);
   const webViewRef = useRef<WebView>(null);
+  const formDataRef = useRef<any>(null);
   const navigation = useNavigation();
 
   const { top } = useLayout();
 
-  // 탭바 재클릭 시 메인 페이지로 이동
+  // IAP 초기화 및 리스너 등록
+  useEffect(() => {
+    let isSubscribed = true; // 구독 상태 관리
+
+    const setupIAP = async () => {
+      if (!isSubscribed) return;
+      // 기존 리스너 제거를 먼저 수행
+      await endConnection();
+
+      await initializeIAP();
+
+      // 새로운 리스너 등록
+      const purchaseUpdateSubscription = purchaseUpdatedListener(
+        async (purchase: ProductPurchase) => {
+          if (!isSubscribed) return;
+
+          const receipt = purchase.transactionReceipt;
+          if (receipt) {
+            try {
+              await finishTransaction({
+                purchase,
+                isConsumable: true,
+              });
+
+              let returnDataForAndroid = null;
+
+              if (Platform.OS === "android") {
+                returnDataForAndroid = {
+                  ...purchase,
+                };
+                if (purchase.dataAndroid)
+                  returnDataForAndroid.dataAndroid = JSON.parse(
+                    purchase.dataAndroid
+                  );
+
+                returnDataForAndroid.transactionReceipt = JSON.parse(receipt);
+              }
+
+              const message = JSON.stringify({
+                type: "PAYMENT_RESULT",
+                data: {
+                  success: true,
+                  formData: formDataRef.current,
+                  productId: purchase.productId,
+                  receipt:
+                    Platform.OS === "ios" ? receipt : returnDataForAndroid,
+                  platform: Platform.OS,
+                },
+              });
+
+              webViewRef.current?.injectJavaScript(
+                `window.postMessage('${message}', '*'); true;`
+              );
+              formDataRef.current = null;
+            } catch (err) {
+              console.warn("구매 완료 처리 실패:", err);
+              handlePurchaseError();
+            }
+          }
+        }
+      );
+
+      const purchaseErrorSubscription = purchaseErrorListener((error: any) => {
+        if (!isSubscribed) return;
+
+        // 사용자 취소는 정상 케이스로 처리
+        if (error.code === "E_USER_CANCELLED") {
+          console.log("[Fortune] 사용자가 결제를 취소했습니다.");
+          webViewRef.current?.injectJavaScript(`
+            window.postMessage(
+              JSON.stringify({
+                type: 'PURCHASE_CANCELLED',
+                data: {}
+              }), '*'
+            );
+          `);
+          formDataRef.current = null;
+          return;
+        }
+
+        // 실제 에러만 로그 출력
+        console.error("[Fortune] 구매 오류:", error);
+        handlePurchaseError(error);
+      });
+
+      return () => {
+        purchaseUpdateSubscription.remove();
+        purchaseErrorSubscription.remove();
+      };
+    };
+
+    setupIAP();
+
+    // 클린업 함수
+    return () => {
+      isSubscribed = false;
+      endConnection();
+    };
+  }, []);
+
+  // 탭바를 숨겨야 하는 경로 체크 함수
+  const shouldHideTabBar = (url: string): boolean => {
+    // /fortune 메인 페이지가 아닌 모든 하위 경로에서 탭바 숨김
+    const baseUrl = WEBVIEW_URLS.FORTUNE;
+
+    // URL이 메인 페이지와 정확히 일치하거나 메인 페이지에서 끝나는 경우만 탭바 표시
+    return url !== baseUrl && !url.endsWith("/fortune") && !url.endsWith("/fortune/");
+  };
+
+  // 탭바 재클릭 시 메인 페이지로 이동 또는 새로고침
   useEffect(() => {
     const unsubscribe = navigation.addListener("tabPress" as any, (e) => {
       console.log("[Fortune] Tab pressed, current URL:", currentUrl);
 
-      // 메인 페이지가 아닌 경우에만 메인으로 이동
-      if (currentUrl !== WEBVIEW_URLS.FORTUNE && webViewRef.current) {
-        console.log("[Fortune] Redirecting to main page");
-        webViewRef.current.injectJavaScript(`
-          window.location.href = '${WEBVIEW_URLS.FORTUNE}';
-          true;
-        `);
+      if (webViewRef.current) {
+        if (currentUrl !== WEBVIEW_URLS.FORTUNE) {
+          // 하위 페이지인 경우 메인으로 이동 (탭바가 숨겨져 있어 실제로는 발생하지 않음)
+          console.log("[Fortune] Redirecting to main page");
+          webViewRef.current.injectJavaScript(`
+            window.location.href = '${WEBVIEW_URLS.FORTUNE}';
+            true;
+          `);
+        } else {
+          // 메인 페이지인 경우 새로고침
+          console.log("[Fortune] Refreshing main page");
+          webViewRef.current.reload();
+        }
       }
     });
 
     return unsubscribe;
   }, [navigation, currentUrl]);
 
+  // 탭바 표시/숨김 제어
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: shouldShowTabBar
+        ? {
+            backgroundColor: "#FFFFFF",
+            borderTopColor: "#E5E7EB",
+            borderTopWidth: 1,
+            height: Platform.OS === "ios" ? 92 : 72,
+            paddingBottom: Platform.OS === "ios" ? 24 : 12,
+            paddingTop: 8,
+          }
+        : { display: "none" },
+    });
+  }, [shouldShowTabBar, navigation]);
+
+  // IAP 초기화 함수
+  const initializeIAP = async () => {
+    try {
+      const temp = await initConnection();
+      if (Platform.OS === "android") {
+        await flushFailedPurchasesCachedAsPendingAndroid();
+      }
+
+      const products = await getProducts({ skus: ProductItem });
+
+      const history = await getPurchaseHistory();
+    } catch (err) {
+      console.warn("IAP 초기화 실패:", err);
+    }
+  };
+
+  // 결제 오류 처리
+  const handlePurchaseError = useCallback((error?: PurchaseError) => {
+    console.warn("Purchase error:", error);
+    webViewRef.current?.injectJavaScript(`
+      window.postMessage(
+        JSON.stringify({
+          type: 'PURCHASE_FAILED',
+          data: { error: 'Purchase failed' }
+        })
+      );
+    `);
+    formDataRef.current = null;
+  }, []);
+
+  // 결제 요청 처리
+  const handlePaymentRequest = async (data: any) => {
+    try {
+      const { type, formData } = data;
+      let productId: string;
+      switch (type) {
+        case "NewyearFortune":
+          productId = ProductItem[0]; // "NewyearFortune"
+          break;
+        case "WorkFortune":
+          productId = ProductItem[1]; // "WorkFortune"
+          break;
+        case "ExamFortune":
+          productId = ProductItem[2]; // "ExamFortune"
+          break;
+        case "LoveFortune":
+          productId = ProductItem[3]; // "LoveFortune"
+          break;
+        case "MatchPremium":
+          productId = ProductItem[4]; // "MatchPremium"
+          break;
+        case "Bigfortune":
+          productId = ProductItem[5]; // "Bigfortune"
+          break;
+        default:
+          throw new Error("Invalid product type");
+      }
+      formDataRef.current = formData;
+      if (Platform.OS === "ios") {
+        await requestPurchase({
+          sku: productId,
+          andDangerouslyFinishTransactionAutomaticallyIOS: false,
+        });
+      } else {
+        await requestPurchase({
+          skus: [productId],
+        });
+      }
+    } catch (error: any) {
+      // E_USER_CANCELLED는 리스너에서 처리하므로 여기서는 무시
+      if (error.code === "E_USER_CANCELLED") {
+        console.log("[Fortune] 결제 취소 (handlePaymentRequest)");
+        return; // 에러를 throw하지 않고 조용히 종료
+      }
+
+      // 실제 에러만 로그 출력 및 WebView에 전달
+      console.error("[Fortune] Purchase request failed:", error);
+      webViewRef.current?.injectJavaScript(`
+        window.postMessage(
+          JSON.stringify({
+            type: 'PURCHASE_ERROR',
+            data: { error: 'Purchase request failed' }
+          }), '*'
+        );
+      `);
+    }
+  };
+
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
       const { type, data } = JSON.parse(event.nativeEvent.data);
 
       switch (type) {
-        // 필요시 사주풀이 전용 메시지 핸들링 추가
+        case "REQUEST_PAYMENT":
+          await handlePaymentRequest(data);
+          break;
+        case "SAVE_SCREEN": // 웹에서 저장 요청이 왔을 때
+          startCapture(); // 캡처 시작
+          break;
+        case "SAVE_IMAGE":
+          await handleImageSave(data);
+          break;
+        case "CAPTURE_FULL_PAGE":
+          await handleFullPageCapture(data);
+          break;
         default:
           console.log("Fortune WebView message:", type, data);
       }
@@ -62,9 +312,226 @@ export default function FortunePage() {
     return true; // 인스타그램 외의 모든 URL은 웹뷰에서 계속 로드
   };
 
+  // 이미지 저장 함수
+  const handleImageSave = async (data: {
+    imageData: string;
+    filename: string;
+  }) => {
+    try {
+      // 권한 요청
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("권한 필요", "갤러리 접근 권한이 필요합니다.");
+        return;
+      }
+
+      // base64 데이터에서 헤더 제거
+      const base64Data = data.imageData.replace(/^data:image\/\w+;base64,/, "");
+
+      // 임시 파일 생성
+      const tempUri = FileSystem.documentDirectory + data.filename;
+      await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // 갤러리에 저장
+      const asset = await MediaLibrary.createAssetAsync(tempUri);
+      await MediaLibrary.createAlbumAsync("행운사주", asset, false);
+
+      // 임시 파일 삭제
+      await FileSystem.deleteAsync(tempUri);
+
+      Alert.alert("저장 완료", "이미지가 갤러리에 저장되었습니다.");
+    } catch (error) {
+      console.error("Image save error:", error);
+      Alert.alert("저장 실패", "이미지 저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  // PDF 저장 함수
+  const handleFullPageCapture = async (data: any) => {
+    try {
+      // PDF 생성
+      const result = await Print.printToFileAsync({
+        html: `
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                ${data.styles}
+                body {
+                  margin: 0;
+                  padding: 0;
+                  width: 100%;
+                  height: 100%;
+                }
+                img {
+                  max-width: 100%;
+                  height: auto;
+                }
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              </style>
+            </head>
+            <body>
+              ${data.content}
+            </body>
+          </html>
+        `,
+        width: data.width || 612,
+        height: data.height || 792,
+      });
+
+      if (Platform.OS === "android") {
+        const permissions =
+          await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+        if (permissions.granted) {
+          const fileName = `행운사주_${new Date().getTime()}.pdf`;
+
+          // PDF 파일을 base64로 변환
+          const base64Data = await FileSystem.readAsStringAsync(result.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          // 선택된 디렉토리에 파일 생성
+          await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            fileName,
+            "application/pdf"
+          ).then(async (uri) => {
+            await FileSystem.writeAsStringAsync(uri, base64Data, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            Alert.alert("저장 완료", "PDF가 저장되었습니다.");
+          });
+        }
+      } else {
+        // iOS의 경우 Documents 디렉토리에 저장
+        const fileName = `행운사주_${new Date().getTime()}.pdf`;
+        const destinationUri = `${FileSystem.documentDirectory}${fileName}`;
+
+        await FileSystem.copyAsync({
+          from: result.uri,
+          to: destinationUri,
+        });
+
+        Alert.alert(
+          "저장 완료",
+          "PDF가 저장되었습니다. Files 앱에서 확인할 수 있습니다."
+        );
+      }
+    } catch (error) {
+      console.error("Full page capture error:", error);
+      Alert.alert("저장 실패", "파일 저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 화면 캡처 시작 함수
+  const startCapture = () => {
+    webViewRef.current?.injectJavaScript(captureFullPageScript);
+  };
+
+  // 전체 페이지 캡처를 위한 JavaScript
+  const captureFullPageScript = `
+(function() {
+  const processNextImage = async (img) => {
+    const srcset = img.getAttribute('srcset');
+    if (srcset) {
+      const srcsetItems = srcset.split(',')
+        .map(item => {
+          const [url, width] = item.trim().split(' ');
+          return {
+            url,
+            width: parseInt(width?.replace('w', '') || '0')
+          };
+        })
+        .sort((a, b) => b.width - a.width);
+
+      if (srcsetItems.length > 0) {
+        img.src = srcsetItems[0].url;
+        img.removeAttribute('srcset');
+        img.removeAttribute('data-nimg');
+      }
+    }
+
+    if (!img.complete) {
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+    }
+  };
+
+  const waitForImages = async () => {
+    const nextImages = document.querySelectorAll('img[data-nimg]');
+    await Promise.all(Array.from(nextImages).map(processNextImage));
+
+    const allImages = document.querySelectorAll('img');
+    await Promise.all(Array.from(allImages).map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+    }));
+  };
+
+  const captureContent = async () => {
+    const element = document.body;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    // 캔버스 크기 설정
+    canvas.width = element.scrollWidth;
+    canvas.height = element.scrollHeight;
+
+    // html2canvas 사용
+    const html2canvas = window.html2canvas;
+    const renderedCanvas = await html2canvas(element, {
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+      width: element.scrollWidth,
+      height: element.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      scale: 1,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      foreignObjectRendering: true,
+    });
+
+    const imageData = renderedCanvas.toDataURL('image/png', 1.0);
+
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'SAVE_IMAGE',
+      data: {
+        imageData: imageData,
+        filename: \`행운사주_\${new Date().getTime()}.png\`
+      }
+    }));
+  };
+
+  waitForImages()
+    .then(captureContent)
+    .catch(error => console.error('캡처 중 오류:', error));
+})();
+`;
+
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
-    setCurrentUrl(navState.url);
-    console.log("[Fortune] Current URL:", navState.url);
+    const newUrl = navState.url;
+    setCurrentUrl(newUrl);
+    console.log("[Fortune] Current URL:", newUrl);
+
+    // 특정 경로에서만 탭바 숨김
+    const hideTabBar = shouldHideTabBar(newUrl);
+    console.log("[Fortune] Should hide tab bar:", hideTabBar);
+    setShouldShowTabBar(!hideTabBar);
   };
 
   const injectScript = `
@@ -88,15 +555,22 @@ export default function FortunePage() {
     // 추가적인 안전장치로 gesturestart 방지
     document.addEventListener('gesturestart', function(e) {
       e.preventDefault();
+
+      // 캡처 함수 추가
+      window.captureScreen = function() {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'SAVE_SCREEN',
+          data: {}
+        }));
+      };
+
       true;
     });
   });
   `;
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, paddingTop: Platform.OS === "ios" ? 0 : top + 4 }}
-    >
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <StatusBar style="dark" />
 
       {/* 상단 섹션 */}

@@ -7,11 +7,11 @@ import {
   Linking,
   Modal,
   Platform,
-  SafeAreaView,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   WebView,
   WebViewMessageEvent,
@@ -26,17 +26,43 @@ export default function ShopPage() {
   const [popupUrl, setPopupUrl] = useState<string | null>(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [shouldShowTabBar, setShouldShowTabBar] = useState(true);
+  const [currentUrl, setCurrentUrl] = useState<string>(WEBVIEW_URLS.SHOP);
   const webViewRef = useRef<WebView>(null);
   const navigation = useNavigation();
 
   const { top } = useLayout();
 
-  // 오행샵 메인 페이지 체크 함수
-  const isMainPage = (url: string): boolean => {
-    // 메인 페이지 패턴: 5hshop.com/ 또는 m.5hshop.com/ (쿼리 파라미터 제외)
-    const mainPagePattern = /^https:\/\/(m\.)?5hshop\.com\/?(\?.*)?$/;
-    return mainPagePattern.test(url);
+  // 탭바를 숨겨야 하는 경로 체크 함수
+  const shouldHideTabBar = (url: string): boolean => {
+    // 상품상세: /goods/goods_view.php?goodsNo=
+    // 장바구니: /order/cart.php
+    // 주문서작성: /order/order.php?cartIdx=
+    // 주문완료: /order/order_end.php?orderNo=
+    return (
+      url.includes("/goods/goods_view.php") ||
+      url.includes("/order/cart.php") ||
+      url.includes("/order/order.php") ||
+      url.includes("/order/order_end.php")
+    );
   };
+
+  // 탭바 재클릭 시 메인 페이지로 이동
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress" as any, (e) => {
+      console.log("[Shop] Tab pressed, current URL:", currentUrl);
+
+      // 메인 페이지가 아닌 경우에만 메인으로 이동
+      if (currentUrl !== WEBVIEW_URLS.SHOP && webViewRef.current) {
+        console.log("[Shop] Redirecting to main page");
+        webViewRef.current.injectJavaScript(`
+          window.location.href = '${WEBVIEW_URLS.SHOP}';
+          true;
+        `);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, currentUrl]);
 
   // 탭바 표시/숨김 제어
   useLayoutEffect(() => {
@@ -226,13 +252,14 @@ export default function ShopPage() {
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);
 
-    const currentUrl = navState.url;
-    console.log("[Shop] Current URL:", currentUrl);
+    const newUrl = navState.url;
+    setCurrentUrl(newUrl);
+    console.log("[Shop] Current URL:", newUrl);
 
-    // 메인 페이지 여부에 따라 탭바 표시/숨김
-    const showTabBar = isMainPage(currentUrl);
-    console.log("[Shop] Is main page:", showTabBar);
-    setShouldShowTabBar(showTabBar);
+    // 특정 경로에서만 탭바 숨김
+    const hideTabBar = shouldHideTabBar(newUrl);
+    console.log("[Shop] Should hide tab bar:", hideTabBar);
+    setShouldShowTabBar(!hideTabBar);
   };
 
   const handleFileDownload = async ({ nativeEvent }: { nativeEvent: any }) => {
@@ -289,9 +316,7 @@ export default function ShopPage() {
   `;
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, paddingTop: Platform.OS === "ios" ? 0 : top + 4 }}
-    >
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <StatusBar style="dark" />
 
       {/* 상단 섹션 */}

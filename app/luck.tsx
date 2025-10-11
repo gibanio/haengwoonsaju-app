@@ -4,7 +4,8 @@ import * as Print from "expo-print";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking, Platform, SafeAreaView, View } from "react-native";
+import { Alert, Linking, Platform, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   endConnection,
   finishTransaction,
@@ -98,8 +99,25 @@ export default function LuckPage() {
 
       const purchaseErrorSubscription = purchaseErrorListener((error: any) => {
         if (!isSubscribed) return;
-        console.warn("구매 오류:", error);
-        handlePurchaseError();
+
+        // 사용자 취소는 정상 케이스로 처리
+        if (error.code === "E_USER_CANCELLED") {
+          console.log("[Luck] 사용자가 결제를 취소했습니다.");
+          webViewRef.current?.injectJavaScript(`
+            window.postMessage(
+              JSON.stringify({
+                type: 'PURCHASE_CANCELLED',
+                data: {}
+              }), '*'
+            );
+          `);
+          formDataRef.current = null;
+          return;
+        }
+
+        // 실제 에러만 로그 출력
+        console.error("[Luck] 구매 오류:", error);
+        handlePurchaseError(error);
       });
 
       return () => {
@@ -193,18 +211,23 @@ export default function LuckPage() {
           skus: [productId],
         });
       }
-    } catch (error) {
-      console.error("Purchase error:", error);
-      // 요청 자체가 실패한 경우에만 에러 메시지 전송
+    } catch (error: any) {
+      // E_USER_CANCELLED는 리스너에서 처리하므로 여기서는 무시
+      if (error.code === "E_USER_CANCELLED") {
+        console.log("[Luck] 결제 취소 (handlePaymentRequest)");
+        return; // 에러를 throw하지 않고 조용히 종료
+      }
+
+      // 실제 에러만 로그 출력 및 WebView에 전달
+      console.error("[Luck] Purchase request failed:", error);
       webViewRef.current?.injectJavaScript(`
-      window.postMessage(
-        JSON.stringify({
-          type: 'PURCHASE_ERROR',
-          data: { error: 'Purchase request failed' }
-        })
-      );
-    `);
-      throw error;
+        window.postMessage(
+          JSON.stringify({
+            type: 'PURCHASE_ERROR',
+            data: { error: 'Purchase request failed' }
+          }), '*'
+        );
+      `);
     }
   };
 
@@ -484,9 +507,7 @@ export default function LuckPage() {
   `;
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, paddingTop: Platform.OS === "ios" ? 0 : top + 4 }}
-    >
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <StatusBar style="dark" />
       {/* 상단 섹션 */}
       <View
