@@ -390,20 +390,24 @@ export default function ShopPage() {
         onRequestClose={() => setIsPopupVisible(false)}
         transparent={false}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+        <View style={{ flex: 1, backgroundColor: "white" }}>
           <View
             style={{
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
               padding: 16,
+              paddingTop: Platform.OS === "ios" ? 60 : 50,
               borderBottomWidth: 1,
               borderBottomColor: "#E5E5E5",
               backgroundColor: "white",
             }}
           >
             <Text style={{ fontSize: 16, fontWeight: "bold" }}>팝업</Text>
-            <TouchableOpacity onPress={() => setIsPopupVisible(false)}>
+            <TouchableOpacity
+              onPress={() => setIsPopupVisible(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={{ fontSize: 24, color: "#666" }}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -417,7 +421,7 @@ export default function ShopPage() {
               style={{ flex: 1 }}
             />
           )}
-        </SafeAreaView>
+        </View>
       </Modal>
     </SafeAreaView>
   );

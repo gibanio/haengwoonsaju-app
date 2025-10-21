@@ -90,6 +90,32 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="luck"
+          options={{
+            title: "행운",
+            tabBarIcon: ({ focused }) => (
+              <CustomTabIcon
+                focused={focused}
+                iconSource={require("../assets/images/luck_icon.png")}
+                size={24}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="fortune"
+          options={{
+            title: "사주풀이",
+            tabBarIcon: ({ focused }) => (
+              <CustomTabIcon
+                focused={focused}
+                iconSource={require("../assets/images/fortune_icon.png")}
+                size={24}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="shop"
           options={{
             title: "오행샵",
@@ -110,33 +136,6 @@ export default function RootLayout() {
               <CustomTabIcon
                 focused={focused}
                 iconSource={require("../assets/images/mypage_icon.png")}
-                size={24}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="fortune"
-          options={{
-            title: "사주풀이",
-            tabBarIcon: ({ focused }) => (
-              <CustomTabIcon
-                focused={focused}
-                iconSource={require("../assets/images/fortune_icon.png")}
-                size={24}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="luck"
-          options={{
-            href: null, // 앱스토어 통과를 위해 임시로 숨김 (OTA 업데이트로 복원 예정)
-            title: "행운",
-            tabBarIcon: ({ focused }) => (
-              <CustomTabIcon
-                focused={focused}
-                iconSource={require("../assets/images/luck_icon.png")}
                 size={24}
               />
             ),
