@@ -3,137 +3,23 @@ import * as MediaLibrary from "expo-media-library";
 import * as Print from "expo-print";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Linking, Platform, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  endConnection,
-  finishTransaction,
-  flushFailedPurchasesCachedAsPendingAndroid,
-  getProducts,
-  getPurchaseHistory,
-  initConnection,
-  ProductPurchase,
-  PurchaseError,
-  purchaseErrorListener,
-  purchaseUpdatedListener,
-  requestPurchase,
-} from "react-native-iap";
 import {
   WebView,
   WebViewMessageEvent,
   WebViewNavigation,
 } from "react-native-webview";
 
-import { ProductItem } from "@/constants/Product";
 import { WEBVIEW_URLS } from "@/constants/WebViewUrls";
 import useLayout from "@/hooks/useLayout";
 
 export default function LuckPage() {
   const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
-  const formDataRef = useRef<any>(null);
 
   const { top } = useLayout();
-
-  useEffect(() => {
-    let isSubscribed = true; // 구독 상태 관리
-
-    const setupIAP = async () => {
-      if (!isSubscribed) return;
-      // 기존 리스너 제거를 먼저 수행
-      await endConnection();
-
-      await initializeIAP();
-
-      // 새로운 리스너 등록
-      const purchaseUpdateSubscription = purchaseUpdatedListener(
-        async (purchase: ProductPurchase) => {
-          if (!isSubscribed) return;
-
-          const receipt = purchase.transactionReceipt;
-          if (receipt) {
-            try {
-              await finishTransaction({
-                purchase,
-                isConsumable: true,
-              });
-
-              let returnDataForAndroid = null;
-
-              if (Platform.OS === "android") {
-                returnDataForAndroid = {
-                  ...purchase,
-                };
-                if (purchase.dataAndroid)
-                  returnDataForAndroid.dataAndroid = JSON.parse(
-                    purchase.dataAndroid
-                  );
-
-                returnDataForAndroid.transactionReceipt = JSON.parse(receipt);
-              }
-
-              const message = JSON.stringify({
-                type: "PAYMENT_RESULT",
-                data: {
-                  success: true,
-                  formData: formDataRef.current,
-                  productId: purchase.productId,
-                  receipt:
-                    Platform.OS === "ios" ? receipt : returnDataForAndroid,
-                  platform: Platform.OS,
-                },
-              });
-
-              webViewRef.current?.injectJavaScript(
-                `window.postMessage('${message}', '*'); true;`
-              );
-              formDataRef.current = null;
-            } catch (err) {
-              console.warn("구매 완료 처리 실패:", err);
-              handlePurchaseError();
-            }
-          }
-        }
-      );
-
-      const purchaseErrorSubscription = purchaseErrorListener((error: any) => {
-        if (!isSubscribed) return;
-
-        // 사용자 취소는 정상 케이스로 처리
-        if (error.code === "E_USER_CANCELLED") {
-          console.log("[Luck] 사용자가 결제를 취소했습니다.");
-          webViewRef.current?.injectJavaScript(`
-            window.postMessage(
-              JSON.stringify({
-                type: 'PURCHASE_CANCELLED',
-                data: {}
-              }), '*'
-            );
-          `);
-          formDataRef.current = null;
-          return;
-        }
-
-        // 실제 에러만 로그 출력
-        console.error("[Luck] 구매 오류:", error);
-        handlePurchaseError(error);
-      });
-
-      return () => {
-        purchaseUpdateSubscription.remove();
-        purchaseErrorSubscription.remove();
-      };
-    };
-
-    setupIAP();
-
-    // 클린업 함수
-    return () => {
-      isSubscribed = false;
-      endConnection();
-    };
-  }, []);
 
   useEffect(() => {
     if (!isLoading) {
@@ -145,100 +31,11 @@ export default function LuckPage() {
     SplashScreen.hideAsync();
   };
 
-  const initializeIAP = async () => {
-    try {
-      const temp = await initConnection();
-      if (Platform.OS === "android") {
-        await flushFailedPurchasesCachedAsPendingAndroid();
-      }
-
-      const products = await getProducts({ skus: ProductItem });
-
-      const history = await getPurchaseHistory();
-    } catch (err) {
-      console.warn("IAP 초기화 실패:", err);
-    }
-  };
-
-  const handlePurchaseError = useCallback((error?: PurchaseError) => {
-    console.warn("Purchase error:", error);
-    webViewRef.current?.injectJavaScript(`
-      window.postMessage(
-        JSON.stringify({
-          type: 'PURCHASE_FAILED',
-          data: { error: 'Purchase failed' }
-        })
-      );
-    `);
-    formDataRef.current = null;
-  }, []);
-
-  // handlePaymentRequest 함수 구현
-  const handlePaymentRequest = async (data: any) => {
-    try {
-      const { type, formData } = data;
-      let productId: string;
-      switch (type) {
-        case "NewyearFortune":
-          productId = ProductItem[0]; // "NewyearFortune"
-          break;
-        case "WorkFortune":
-          productId = ProductItem[1]; // "WorkFortune"
-          break;
-        case "ExamFortune":
-          productId = ProductItem[2]; // "ExamFortune"
-          break;
-        case "LoveFortune":
-          productId = ProductItem[3]; // "LoveFortune"
-          break;
-        case "MatchPremium":
-          productId = ProductItem[4]; // "MatchPremium"
-          break;
-        case "Bigfortune":
-          productId = ProductItem[5]; // "Bigfortune"
-          break;
-        default:
-          throw new Error("Invalid product type");
-      }
-      formDataRef.current = formData;
-      if (Platform.OS === "ios") {
-        await requestPurchase({
-          sku: productId,
-          andDangerouslyFinishTransactionAutomaticallyIOS: false,
-        });
-      } else {
-        await requestPurchase({
-          skus: [productId],
-        });
-      }
-    } catch (error: any) {
-      // E_USER_CANCELLED는 리스너에서 처리하므로 여기서는 무시
-      if (error.code === "E_USER_CANCELLED") {
-        console.log("[Luck] 결제 취소 (handlePaymentRequest)");
-        return; // 에러를 throw하지 않고 조용히 종료
-      }
-
-      // 실제 에러만 로그 출력 및 WebView에 전달
-      console.error("[Luck] Purchase request failed:", error);
-      webViewRef.current?.injectJavaScript(`
-        window.postMessage(
-          JSON.stringify({
-            type: 'PURCHASE_ERROR',
-            data: { error: 'Purchase request failed' }
-          }), '*'
-        );
-      `);
-    }
-  };
-
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
       const { type, data } = JSON.parse(event.nativeEvent.data);
 
       switch (type) {
-        case "REQUEST_PAYMENT":
-          await handlePaymentRequest(data);
-          break;
         case "SAVE_SCREEN": // 웹에서 저장 요청이 왔을 때
           startCapture(); // 캡처 시작
           break;

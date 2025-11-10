@@ -3,29 +3,15 @@ import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as Print from "expo-print";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert, Linking, Platform, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  endConnection,
-  finishTransaction,
-  flushFailedPurchasesCachedAsPendingAndroid,
-  getProducts,
-  getPurchaseHistory,
-  initConnection,
-  ProductPurchase,
-  PurchaseError,
-  purchaseErrorListener,
-  purchaseUpdatedListener,
-  requestPurchase,
-} from "react-native-iap";
 import {
   WebView,
   WebViewMessageEvent,
   WebViewNavigation,
 } from "react-native-webview";
 
-import { ProductItem } from "@/constants/Product";
 import { WEBVIEW_URLS } from "@/constants/WebViewUrls";
 import useLayout from "@/hooks/useLayout";
 
@@ -34,110 +20,10 @@ export default function FortunePage() {
   const [shouldShowTabBar, setShouldShowTabBar] = useState(true);
   const [currentUrl, setCurrentUrl] = useState<string>(WEBVIEW_URLS.FORTUNE);
   const webViewRef = useRef<WebView>(null);
-  const formDataRef = useRef<any>(null);
   const navigation = useNavigation();
+  const paymentProcessingRef = useRef<boolean>(false);
 
   const { top } = useLayout();
-
-  // IAP 초기화 및 리스너 등록
-  useEffect(() => {
-    let isSubscribed = true; // 구독 상태 관리
-
-    const setupIAP = async () => {
-      if (!isSubscribed) return;
-      // 기존 리스너 제거를 먼저 수행
-      await endConnection();
-
-      await initializeIAP();
-
-      // 새로운 리스너 등록
-      const purchaseUpdateSubscription = purchaseUpdatedListener(
-        async (purchase: ProductPurchase) => {
-          if (!isSubscribed) return;
-
-          const receipt = purchase.transactionReceipt;
-          if (receipt) {
-            try {
-              await finishTransaction({
-                purchase,
-                isConsumable: true,
-              });
-
-              let returnDataForAndroid = null;
-
-              if (Platform.OS === "android") {
-                returnDataForAndroid = {
-                  ...purchase,
-                };
-                if (purchase.dataAndroid)
-                  returnDataForAndroid.dataAndroid = JSON.parse(
-                    purchase.dataAndroid
-                  );
-
-                returnDataForAndroid.transactionReceipt = JSON.parse(receipt);
-              }
-
-              const message = JSON.stringify({
-                type: "PAYMENT_RESULT",
-                data: {
-                  success: true,
-                  formData: formDataRef.current,
-                  productId: purchase.productId,
-                  receipt:
-                    Platform.OS === "ios" ? receipt : returnDataForAndroid,
-                  platform: Platform.OS,
-                },
-              });
-
-              webViewRef.current?.injectJavaScript(
-                `window.postMessage('${message}', '*'); true;`
-              );
-              formDataRef.current = null;
-            } catch (err) {
-              console.warn("구매 완료 처리 실패:", err);
-              handlePurchaseError();
-            }
-          }
-        }
-      );
-
-      const purchaseErrorSubscription = purchaseErrorListener((error: any) => {
-        if (!isSubscribed) return;
-
-        // 사용자 취소는 정상 케이스로 처리
-        if (error.code === "E_USER_CANCELLED") {
-          console.log("[Fortune] 사용자가 결제를 취소했습니다.");
-          webViewRef.current?.injectJavaScript(`
-            window.postMessage(
-              JSON.stringify({
-                type: 'PURCHASE_CANCELLED',
-                data: {}
-              }), '*'
-            );
-          `);
-          formDataRef.current = null;
-          return;
-        }
-
-        // 실제 에러만 로그 출력
-        console.error("[Fortune] 구매 오류:", error);
-        handlePurchaseError(error);
-      });
-
-      return () => {
-        purchaseUpdateSubscription.remove();
-        purchaseErrorSubscription.remove();
-      };
-    };
-
-    setupIAP();
-
-    // 클린업 함수
-    return () => {
-      isSubscribed = false;
-      endConnection();
-    };
-  }, []);
 
   // 탭바를 숨겨야 하는 경로 체크 함수
   const shouldHideTabBar = (url: string): boolean => {
@@ -188,92 +74,35 @@ export default function FortunePage() {
     });
   }, [shouldShowTabBar, navigation]);
 
-  // IAP 초기화 함수
-  const initializeIAP = async () => {
-    try {
-      const temp = await initConnection();
-      if (Platform.OS === "android") {
-        await flushFailedPurchasesCachedAsPendingAndroid();
+  // PG 결제 완료 URL 처리
+  const handlePaymentCallback = (url: string) => {
+    // URL에서 파라미터 추출
+    const urlObj = new URL(url);
+    const imp_uid = urlObj.searchParams.get("imp_uid");
+    const merchant_uid = urlObj.searchParams.get("merchant_uid");
+    const error_code = urlObj.searchParams.get("error_code");
+    const success = urlObj.searchParams.get("success");
+
+    console.log("[Fortune] Payment callback:", { imp_uid, merchant_uid, error_code, success });
+
+    // 결제 결과를 WebView로 전달
+    const message = {
+      type: "PG_PAYMENT_RESULT",
+      data: {
+        imp_uid,
+        merchant_uid,
+        error_code,
+        success: success === "true" || !error_code,
       }
+    };
 
-      const products = await getProducts({ skus: ProductItem });
-
-      const history = await getPurchaseHistory();
-    } catch (err) {
-      console.warn("IAP 초기화 실패:", err);
-    }
-  };
-
-  // 결제 오류 처리
-  const handlePurchaseError = useCallback((error?: PurchaseError) => {
-    console.warn("Purchase error:", error);
     webViewRef.current?.injectJavaScript(`
-      window.postMessage(
-        JSON.stringify({
-          type: 'PURCHASE_FAILED',
-          data: { error: 'Purchase failed' }
-        })
-      );
+      window.postMessage(${JSON.stringify(JSON.stringify(message))}, '*');
+      true;
     `);
-    formDataRef.current = null;
-  }, []);
 
-  // 결제 요청 처리
-  const handlePaymentRequest = async (data: any) => {
-    try {
-      const { type, formData } = data;
-      let productId: string;
-      switch (type) {
-        case "NewyearFortune":
-          productId = ProductItem[0]; // "NewyearFortune"
-          break;
-        case "WorkFortune":
-          productId = ProductItem[1]; // "WorkFortune"
-          break;
-        case "ExamFortune":
-          productId = ProductItem[2]; // "ExamFortune"
-          break;
-        case "LoveFortune":
-          productId = ProductItem[3]; // "LoveFortune"
-          break;
-        case "MatchPremium":
-          productId = ProductItem[4]; // "MatchPremium"
-          break;
-        case "Bigfortune":
-          productId = ProductItem[5]; // "Bigfortune"
-          break;
-        default:
-          throw new Error("Invalid product type");
-      }
-      formDataRef.current = formData;
-      if (Platform.OS === "ios") {
-        await requestPurchase({
-          sku: productId,
-          andDangerouslyFinishTransactionAutomaticallyIOS: false,
-        });
-      } else {
-        await requestPurchase({
-          skus: [productId],
-        });
-      }
-    } catch (error: any) {
-      // E_USER_CANCELLED는 리스너에서 처리하므로 여기서는 무시
-      if (error.code === "E_USER_CANCELLED") {
-        console.log("[Fortune] 결제 취소 (handlePaymentRequest)");
-        return; // 에러를 throw하지 않고 조용히 종료
-      }
-
-      // 실제 에러만 로그 출력 및 WebView에 전달
-      console.error("[Fortune] Purchase request failed:", error);
-      webViewRef.current?.injectJavaScript(`
-        window.postMessage(
-          JSON.stringify({
-            type: 'PURCHASE_ERROR',
-            data: { error: 'Purchase request failed' }
-          }), '*'
-        );
-      `);
-    }
+    // 결제 처리 플래그 리셋
+    paymentProcessingRef.current = false;
   };
 
   const handleMessage = async (event: WebViewMessageEvent) => {
@@ -281,9 +110,6 @@ export default function FortunePage() {
       const { type, data } = JSON.parse(event.nativeEvent.data);
 
       switch (type) {
-        case "REQUEST_PAYMENT":
-          await handlePaymentRequest(data);
-          break;
         case "SAVE_SCREEN": // 웹에서 저장 요청이 왔을 때
           startCapture(); // 캡처 시작
           break;
@@ -304,12 +130,71 @@ export default function FortunePage() {
   const handleShouldStartLoadWithRequest = (
     request: WebViewNavigation
   ): boolean => {
-    // 인스타그램 링크만 외부 브라우저로 열기
-    if (request.url.includes("instagram.com")) {
-      Linking.openURL(request.url);
+    const url = request.url;
+
+    // 인스타그램 링크는 외부 브라우저로 열기
+    if (url.includes("instagram.com")) {
+      Linking.openURL(url);
       return false; // WebView 로딩 중지
     }
-    return true; // 인스타그램 외의 모든 URL은 웹뷰에서 계속 로드
+
+    // PG 결제 관련 URL 처리
+    // nice, inicis, kakao 등 PG사 도메인 허용
+    const pgDomains = [
+      "service.iamport.kr",
+      "mobile.inicis.com",
+      "ansimclick.inicis.com",
+      "stg-mobile.inicis.com",
+      "stdpay.inicis.com",
+      "niceinfo.co.kr",
+      "nicepay.co.kr",
+      "kakao.com",
+      "ksmobile.danal.co.kr",
+      "teledit.com",
+      "kicc.co.kr",
+      "card.kbcard.com"
+    ];
+
+    // PG사 도메인이면 WebView 내에서 처리
+    if (pgDomains.some(domain => url.includes(domain))) {
+      return true;
+    }
+
+    // 앱 스킴 처리 (카드사 앱 등)
+    const appSchemes = [
+      "intent://",
+      "kakaotalk://",
+      "ispmobile://",
+      "hdcardappcardansimclick://",
+      "shinhan-sr-ansimclick://",
+      "smshinhanansimclick://",
+      "kb-acp://",
+      "mpocket.online.ansimclick://",
+      "lottesmartpay://",
+      "lotteappcard://",
+      "cloudpay://",
+      "hanawalletmembers://",
+      "citispay://",
+      "citicardappkr://",
+      "citimobileapp://",
+      "chaipayment://",
+      "payco://",
+    ];
+
+    // 앱 스킴이면 외부 앱으로 열기
+    if (appSchemes.some(scheme => url.startsWith(scheme))) {
+      Linking.openURL(url).catch(err => {
+        console.log("[Fortune] Failed to open app scheme:", err);
+        // 앱이 설치되어 있지 않은 경우 처리
+        Alert.alert(
+          "앱을 열 수 없습니다",
+          "해당 앱이 설치되어 있지 않습니다. 앱스토어에서 설치해주세요."
+        );
+      });
+      return false;
+    }
+
+    return true; // 기타 URL은 웹뷰에서 계속 로드
   };
 
   // 이미지 저장 함수
@@ -527,6 +412,15 @@ export default function FortunePage() {
     const newUrl = navState.url;
     setCurrentUrl(newUrl);
     console.log("[Fortune] Current URL:", newUrl);
+
+    // PG 결제 완료 콜백 URL 감지
+    if (newUrl.includes("/fortune/") && newUrl.includes("/payment")) {
+      // 결제 완료 페이지로 이동한 경우
+      if (!paymentProcessingRef.current) {
+        paymentProcessingRef.current = true;
+        handlePaymentCallback(newUrl);
+      }
+    }
 
     // 특정 경로에서만 탭바 숨김
     const hideTabBar = shouldHideTabBar(newUrl);

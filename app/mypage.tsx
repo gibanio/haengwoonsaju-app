@@ -362,10 +362,21 @@ export default function MyPage() {
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onOpenWindow={handleOpenWindow}
         onFileDownload={handleFileDownload}
+        onRenderProcessGone={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.warn("[MyPage] WebView Crashed:", nativeEvent);
+          // WebView 크래시 시 자동 복구
+          if (webViewRef.current) {
+            webViewRef.current.reload();
+          }
+        }}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         setSupportMultipleWindows={true}
         allowFileAccess={true}
+        allowFileAccessFromFileURLs={true}
+        allowUniversalAccessFromFileURLs={true}
+        mixedContentMode="compatibility"
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
         bounces={false}

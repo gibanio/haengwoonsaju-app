@@ -7,7 +7,13 @@
       "Bash(npx tsc:*)",
       "Bash(node:*)",
       "Bash(npx expo config:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Read(//Users/giban/Project/project/haengwoonsaju/workspace/**)",
+      "Bash(npm install)",
+      "Bash(awk:*)",
+      "Read(//Users/giban/Project/project/pickpro/workspace/pickpro/docs/**)",
+      "Bash(eas build:*)",
+      "Bash(eas update:list:*)"
     ],
     "deny": []
   }

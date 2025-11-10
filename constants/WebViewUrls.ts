@@ -3,12 +3,14 @@
  * 각 탭에서 사용할 웹뷰 URL을 중앙에서 관리
  */
 
+import Config from "./Config";
+
 export const WEBVIEW_URLS = {
   // 행운 탭 - 메인 운세 서비스 (인앱구매, 이미지/PDF 저장 기능 포함)
-  LUCK: "https://dev.haengwoonsaju.com/luck",
+  LUCK: `${Config.API_HOST}/luck`,
 
   // 사주풀이 탭 - 사주 관련 콘텐츠
-  FORTUNE: "https://dev.haengwoonsaju.com/fortune",
+  FORTUNE: `${Config.API_HOST}/fortune`,
 
   // 오행샵 탭 - 외부 쇼핑몰 연동
   SHOP: "https://5hshop.com/",
