@@ -1,4 +1,4 @@
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as Print from "expo-print";
@@ -19,11 +19,30 @@ export default function FortunePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowTabBar, setShouldShowTabBar] = useState(true);
   const [currentUrl, setCurrentUrl] = useState<string>(WEBVIEW_URLS.FORTUNE);
+  const [initialUrl, setInitialUrl] = useState<string>(WEBVIEW_URLS.FORTUNE);
   const webViewRef = useRef<WebView>(null);
   const navigation = useNavigation();
+  const route = useRoute();
   const paymentProcessingRef = useRef<boolean>(false);
 
   const { top } = useLayout();
+
+  // 다른 탭에서 전달된 URL로 이동
+  useEffect(() => {
+    const params = route.params as { targetUrl?: string } | undefined;
+    if (params?.targetUrl) {
+      console.log("[Fortune] Navigating to target URL:", params.targetUrl);
+      setInitialUrl(params.targetUrl);
+
+      // 웹뷰가 이미 로드된 경우 JavaScript로 이동
+      if (webViewRef.current) {
+        webViewRef.current.injectJavaScript(`
+          window.location.href = '${params.targetUrl}';
+          true;
+        `);
+      }
+    }
+  }, [route.params]);
 
   // 탭바를 숨겨야 하는 경로 체크 함수
   const shouldHideTabBar = (url: string): boolean => {
@@ -493,7 +512,7 @@ export default function FortunePage() {
 
       <WebView
         ref={webViewRef}
-        source={{ uri: WEBVIEW_URLS.FORTUNE }}
+        source={{ uri: initialUrl }}
         style={{
           flex: 1,
         }}

@@ -1,3 +1,4 @@
+import { useNavigation } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as Print from "expo-print";
@@ -17,7 +18,9 @@ import useLayout from "@/hooks/useLayout";
 
 export default function LuckPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUrl, setCurrentUrl] = useState<string>(WEBVIEW_URLS.LUCK);
   const webViewRef = useRef<WebView>(null);
+  const navigation = useNavigation();
 
   const { top } = useLayout();
 
@@ -30,6 +33,30 @@ export default function LuckPage() {
   const hideSplash = async () => {
     SplashScreen.hideAsync();
   };
+
+  // 탭바 재클릭 시 메인 페이지로 이동 또는 새로고침
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress" as any, (e) => {
+      console.log("[Luck] Tab pressed, current URL:", currentUrl);
+
+      if (webViewRef.current) {
+        if (currentUrl !== WEBVIEW_URLS.LUCK) {
+          // 하위 페이지인 경우 메인으로 이동
+          console.log("[Luck] Redirecting to main page");
+          webViewRef.current.injectJavaScript(`
+            window.location.href = '${WEBVIEW_URLS.LUCK}';
+            true;
+          `);
+        } else {
+          // 메인 페이지인 경우 새로고침
+          console.log("[Luck] Refreshing main page");
+          webViewRef.current.reload();
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, currentUrl]);
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
@@ -265,6 +292,29 @@ export default function LuckPage() {
     return true; // 인스타그램 외의 모든 URL은 웹뷰에서 계속 로드
   };
 
+  const handleNavigationStateChange = (navState: WebViewNavigation) => {
+    const newUrl = navState.url;
+    setCurrentUrl(newUrl);
+    console.log("[Luck] Current URL:", newUrl);
+
+    // fortune 관련 URL로 이동하려는 경우 사주풀이 탭으로 전환
+    if (newUrl.includes("/fortune")) {
+      console.log("[Luck] Detected fortune URL, navigating to fortune tab with URL:", newUrl);
+      navigation.navigate("fortune" as never, { targetUrl: newUrl } as never);
+
+      // 웹뷰가 실제로 fortune URL을 로드하지 않도록 행운 탭 메인으로 되돌림
+      setTimeout(() => {
+        if (webViewRef.current && currentUrl !== WEBVIEW_URLS.LUCK) {
+          webViewRef.current.injectJavaScript(`
+            window.location.href = '${WEBVIEW_URLS.LUCK}';
+            true;
+          `);
+        }
+      }, 100);
+      return;
+    }
+  };
+
   const startCapture = () => {
     webViewRef.current?.injectJavaScript(captureFullPageScript);
   };
@@ -349,6 +399,7 @@ export default function LuckPage() {
     `);
         }}
         onMessage={handleMessage}
+        onNavigationStateChange={handleNavigationStateChange}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         bounces={false}

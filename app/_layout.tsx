@@ -3,7 +3,10 @@ import "react-native-reanimated";
 import { useFonts } from "expo-font";
 import { Tabs } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as Updates from "expo-updates";
+import { useEffect } from "react";
 import {
+  Alert,
   GestureResponderEvent,
   Platform,
   Pressable,
@@ -48,6 +51,59 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
+
+  // OTA 업데이트 체크 및 적용
+  useEffect(() => {
+    async function checkForUpdates() {
+      try {
+        // 개발 모드에서는 업데이트 체크 안 함
+        if (__DEV__) {
+          console.log("[Update] 개발 모드에서는 업데이트 체크를 건너뜁니다.");
+          return;
+        }
+
+        console.log("[Update] 업데이트 확인 중...");
+        const update = await Updates.checkForUpdateAsync();
+
+        if (update.isAvailable) {
+          console.log("[Update] 새로운 업데이트 발견!");
+
+          // 백그라운드에서 업데이트 다운로드
+          await Updates.fetchUpdateAsync();
+          console.log("[Update] 업데이트 다운로드 완료");
+
+          // 사용자에게 알림
+          Alert.alert(
+            "업데이트 가능",
+            "새로운 업데이트가 준비되었습니다. 지금 적용하시겠습니까?",
+            [
+              {
+                text: "나중에",
+                style: "cancel",
+                onPress: () => {
+                  console.log("[Update] 사용자가 업데이트를 연기했습니다.");
+                },
+              },
+              {
+                text: "적용",
+                onPress: async () => {
+                  console.log("[Update] 업데이트 적용 중...");
+                  await Updates.reloadAsync();
+                },
+              },
+            ]
+          );
+        } else {
+          console.log("[Update] 최신 버전을 사용 중입니다.");
+        }
+      } catch (error) {
+        console.error("[Update] 업데이트 확인 중 오류:", error);
+        // 업데이트 체크 실패는 앱 동작에 영향을 주지 않음
+      }
+    }
+
+    checkForUpdates();
+  }, []);
 
   if (!loaded) {
     return null;
