@@ -6,7 +6,6 @@ import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
 import { useEffect } from "react";
 import {
-  Alert,
   GestureResponderEvent,
   Platform,
   Pressable,
@@ -66,33 +65,12 @@ export default function RootLayout() {
         const update = await Updates.checkForUpdateAsync();
 
         if (update.isAvailable) {
-          console.log("[Update] 새로운 업데이트 발견!");
-
-          // 백그라운드에서 업데이트 다운로드
+          console.log("[Update] 새로운 업데이트 발견! 다운로드 시작...");
           await Updates.fetchUpdateAsync();
-          console.log("[Update] 업데이트 다운로드 완료");
+          console.log("[Update] 업데이트 다운로드 완료. 앱을 재시작합니다.");
 
-          // 사용자에게 알림
-          Alert.alert(
-            "업데이트 가능",
-            "새로운 업데이트가 준비되었습니다. 지금 적용하시겠습니까?",
-            [
-              {
-                text: "나중에",
-                style: "cancel",
-                onPress: () => {
-                  console.log("[Update] 사용자가 업데이트를 연기했습니다.");
-                },
-              },
-              {
-                text: "적용",
-                onPress: async () => {
-                  console.log("[Update] 업데이트 적용 중...");
-                  await Updates.reloadAsync();
-                },
-              },
-            ]
-          );
+          // 즉시 강제 적용 (사용자 선택 없음)
+          await Updates.reloadAsync();
         } else {
           console.log("[Update] 최신 버전을 사용 중입니다.");
         }
